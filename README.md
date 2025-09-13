@@ -1,13 +1,15 @@
 # File Server Go
 
-Простой файловый сервер на Go для загрузки, скачивания и управления файлами.
+Простой файловый сервер на Go с поддержкой аутентификации для управления файлами и директориями.
 
 ## Возможности
 
-- 📤 Загрузка файлов через веб-интерфейс
+- 📤 Загрузка файлов через веб-интерфейс или API
 - 📥 Скачивание файлов
-- 📋 Просмотр списка загруженных файлов
-- 🌐 Простой веб-интерфейс
+- 📋 Просмотр списка файлов и директорий
+- 📁 Создание и удаление директорий
+- 🔐 JWT аутентификация
+- 🌐 Современный веб-интерфейс
 - 🔒 CORS поддержка
 - 📝 Логирование запросов
 
@@ -47,29 +49,109 @@ make build-all  # Собрать для всех платформ
 
 - `PORT` - порт сервера (по умолчанию: 8080)
 - `UPLOAD_DIR` - папка для загруженных файлов (по умолчанию: ./uploads)
+- `JWT_SECRET` - секретный ключ для JWT токенов
+- `AUTH_USERNAME` - имя пользователя для аутентификации
+- `AUTH_PASSWORD` - пароль для аутентификации
 
 Пример:
 ```bash
 export PORT=3000
 export UPLOAD_DIR=/path/to/uploads
+export JWT_SECRET=your-secret-key
+export AUTH_USERNAME=admin
+export AUTH_PASSWORD=password
 make run
 ```
 
 ## API
 
-### Загрузка файла
+### Аутентификация
+
+Для получения JWT токена:
 ```bash
-curl -X POST -F "file=@example.txt" http://localhost:8080/upload
+# Получение токена
+curl -X POST http://localhost:8080/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"admin","password":"password"}'
+
+# Ответ будет содержать токен:
+# {"token":"your-jwt-token"}
 ```
 
-### Список файлов
+### Работа с файлами
+
+#### Загрузка файла через curl
 ```bash
-curl http://localhost:8080/files
+# Загрузка файла в корневую директорию
+curl -X POST http://localhost:8080/upload \
+  -H "Authorization: Bearer your-jwt-token" \
+  -F "file=@path/to/your/file.txt"
+
+# Загрузка файла в определенную директорию
+curl -X POST http://localhost:8080/upload \
+  -H "Authorization: Bearer your-jwt-token" \
+  -F "file=@path/to/your/file.txt" \
+  -F "path=directory/subdirectory"
+
+# Прямая загрузка файла (raw upload)
+curl -X PUT http://localhost:8080/upload/raw/filename.txt \
+  -H "Authorization: Bearer your-jwt-token" \
+  --data-binary @path/to/your/file.txt
 ```
 
-### Скачивание файла
+#### Загрузка файла через wget
 ```bash
-curl -O http://localhost:8080/download/example.txt
+# Получение токена и сохранение в переменную
+TOKEN=$(wget -qO- --post-data='{"username":"admin","password":"password"}' \
+  --header='Content-Type: application/json' \
+  http://localhost:8080/login | grep -o '"token":"[^"]*' | cut -d'"' -f4)
+
+# Загрузка файла
+wget --method=POST \
+  --header="Authorization: Bearer $TOKEN" \
+  --body-file=/path/to/your/file.txt \
+  http://localhost:8080/upload/raw/filename.txt
+```
+
+#### Список файлов и директорий
+```bash
+# Получить список файлов в корневой директории
+curl http://localhost:8080/files \
+  -H "Authorization: Bearer your-jwt-token" \
+  -H "Content-Type: application/json"
+
+# Получить список файлов в определенной директории
+curl -X POST http://localhost:8080/files \
+  -H "Authorization: Bearer your-jwt-token" \
+  -H "Content-Type: application/json" \
+  -d '{"path": "directory/subdirectory"}'
+```
+
+#### Скачивание файла
+```bash
+# Скачивание файла
+curl -O -H "Authorization: Bearer your-jwt-token" \
+  http://localhost:8080/download/path/to/file.txt
+```
+
+#### Работа с директориями
+```bash
+# Создание директории
+curl -X POST http://localhost:8080/create-dir \
+  -H "Authorization: Bearer your-jwt-token" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "dirname": "new_directory",
+    "path": "parent_directory"
+  }'
+
+# Удаление директории
+curl -X DELETE http://localhost:8080/delete-dir?path=directory/to/delete \
+  -H "Authorization: Bearer your-jwt-token" \
+
+# Удаление файла
+curl -X DELETE http://localhost:8080/delete-file?path=path/to/file.txt\
+  -H "Authorization: Bearer your-jwt-token" \
 ```
 
 ## Структура проекта
@@ -77,15 +159,26 @@ curl -O http://localhost:8080/download/example.txt
 ```
 file-server-go/
 ├── cmd/server/          # Точка входа приложения
-├── internal/            # Приватный код приложения
-│   ├── config/         # Конфигурация
-│   ├── handlers/       # HTTP обработчики
-│   ├── middleware/     # HTTP middleware
-│   └── server/         # HTTP сервер
-├── uploads/            # Загруженные файлы
-├── Makefile           # Make команды
-└── README.md          # Документация
+├── internal/           # Приватный код приложения
+│   ├── auth/          # Аутентификация и JWT
+│   ├── config/        # Конфигурация
+│   ├── handlers/      # HTTP обработчики
+│   ├── middleware/    # HTTP middleware
+│   └── server/        # HTTP сервер
+├── web/              # Веб-интерфейс
+│   └── templates/    # HTML шаблоны
+├── uploads/          # Загруженные файлы
+├── Makefile         # Make команды
+└── README.md        # Документация
 ```
+
+## Безопасность
+
+- Все запросы к API требуют JWT аутентификации
+- Поддерживается валидация путей для предотвращения path traversal атак
+- Ограничение размера загружаемых файлов (по умолчанию 32MB)
+- Проверка MIME-типов файлов
+- Санитизация имен файлов и директорий
 
 ## Разработка
 

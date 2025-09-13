@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <title>Файловый сервер</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <style>
+        .error-container {
+            display: none;
+            margin-bottom: 1rem;
+        }
+        .clickable {
+            cursor: pointer;
+            color: #0d6efd;
+            text-decoration: none;
+        }
+        .clickable:hover {
+            text-decoration: underline;
+        }
+        .current-path {
+            background-color: #f8f9fa;
+            padding: 0.5rem 1rem;
+            margin-bottom: 1rem;
+            border-radius: 0.25rem;
+            border: 1px solid #dee2e6;
+        }
+        .context-menu {
+            position: fixed;
+            z-index: 1000;
+            background: white;
+            border: 1px solid #dee2e6;
+            border-radius: 0.25rem;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            display: none;
+        }
+        .context-menu-item {
+            padding: 0.5rem 1rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .context-menu-item:hover {
+            background-color: #f8f9fa;
+        }
+        .context-menu-item.dangerous {
+            color: #dc3545;
+        }
+        .context-menu-item.dangerous:hover {
+            background-color: #fff5f5;
+        }
+        .login-container {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+        }
+        .context-menu-item.folder {
+            color: #198754;
+        }
+        .context-menu-item.folder:hover {
+            background-color: #f1f9f3;
+        }
+        #currentPath {
+            user-select: none;
+        }
+        #currentPath > span:last-child {
+            color: inherit;
+            cursor: default;
+        }
+        #currentPath > span:last-child:hover {
+            text-decoration: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container py-4">
+        <!-- Секция ошибок -->
+        <div id="errorSection" class="error-container alert alert-danger alert-dismissible fade show" role="alert">
+            <span id="errorMessage"></span>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+
+        <!-- Секция входа -->
+        <div id="loginSection" class="login-container">
+            <div class="row justify-content-center w-100">
+                <div class="col-md-6 col-lg-4">
+                    <div class="card shadow">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0">Вход в систему</h5>
+                        </div>
+                        <div class="card-body">
+                            <form id="loginForm" class="mb-3">
+                                <div class="mb-3">
+                                    <label for="username" class="form-label">Имя пользователя</label>
+                                    <input type="text" class="form-control" id="username" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="password" class="form-label">Пароль</label>
+                                    <input type="password" class="form-control" id="password" required>
+                                </div>
+                                <button type="submit" class="btn btn-primary w-100">Войти</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Основная секция -->
+        <div id="mainSection" style="display: none;">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1>Файловый сервер</h1>
+                <button id="logoutBtn" class="btn btn-outline-danger">Выйти</button>
+            </div>
+
+            <div class="current-path mb-3">
+                <i class="bi bi-folder2-open me-2"></i>
+                <span id="currentPath">Корневая директория</span>
+            </div>
+
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="card h-100">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0">Загрузка файла</h5>
+                        </div>
+                        <div class="card-body">
+                            <form id="uploadForm" class="mb-3">
+                                <input type="hidden" id="uploadPath" name="path" value=".">
+                                <div class="mb-3">
+                                    <label for="file" class="form-label">Выберите файл для загрузки</label>
+                                    <input type="file" class="form-control" id="file" name="file" required>
+                                    <div class="form-text">Максимальный размер файла: 32MB</div>
+                                </div>
+                                <div class="progress mb-3 d-none">
+                                    <div class="progress-bar" role="progressbar" style="width: 0%"></div>
+                                </div>
+                                <button type="submit" class="btn btn-primary">Загрузить</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0">Список файлов и директорий</h5>
+                    <button class="btn btn-success btn-sm" onclick="showCreateDirDialog(currentPath)">
+                        <i class="bi bi-folder-plus me-1"></i>
+                        Создать директорию
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div id="files">
+                        <div class="text-center">
+                            <div class="spinner-border" role="status">
+                                <span class="visually-hidden">Загрузка...</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Контекстное меню -->
+    <div id="contextMenu" class="context-menu">
+        <div class="context-menu-item folder" data-action="create">
+            <i class="bi bi-folder-plus"></i>
+            Создать директорию
+        </div>
+        <div class="context-menu-item dangerous" data-action="delete">
+            <i class="bi bi-trash"></i>
+            Удалить
+        </div>
+    </div>
+
+    <!-- Модальное окно подтверждения удаления -->
+    <div class="modal fade" id="confirmModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Подтверждение удаления</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Вы действительно хотите удалить <span id="itemType">директорию</span> "<span id="itemToDelete"></span>"?</p>
+                    <p class="text-danger">Это действие нельзя отменить!</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                    <button type="button" class="btn btn-danger" id="confirmDelete">Удалить</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно создания директории -->
+    <div class="modal fade" id="createDirModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Создание директории</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="createDirForm">
+                        <input type="hidden" id="createDirPath" name="path" value=".">
+                        <div class="mb-3">
+                            <label for="dirname" class="form-label">Имя директории</label>
+                            <input type="text" class="form-control" id="dirname" name="dirname" required>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                    <button type="submit" form="createDirForm" class="btn btn-primary">Создать</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let currentPath = '.';
+
+        // Показать ошибку
+        function showError(message) {
+            const errorSection = document.getElementById('errorSection');
+            const errorMessage = document.getElementById('errorMessage');
+
+            // Создаем секцию ошибки, если она не существует
+            if (!errorSection || !errorMessage) {
+                // Создаем элементы
+                const newErrorSection = document.createElement('div');
+                newErrorSection.id = 'errorSection';
+                newErrorSection.className = 'error-container alert alert-danger alert-dismissible fade show';
+                newErrorSection.setAttribute('role', 'alert');
+
+                const newErrorMessage = document.createElement('span');
+                newErrorMessage.id = 'errorMessage';
+                newErrorMessage.textContent = message;
+
+                const closeButton = document.createElement('button');
+                closeButton.type = 'button';
+                closeButton.className = 'btn-close';
+                closeButton.setAttribute('data-bs-dismiss', 'alert');
+                closeButton.setAttribute('aria-label', 'Close');
+
+                // Собираем элементы
+                newErrorSection.appendChild(newErrorMessage);
+                newErrorSection.appendChild(closeButton);
+
+                // Добавляем в начало контейнера
+                const container = document.querySelector('.container');
+                if (container) {
+                    container.insertBefore(newErrorSection, container.firstChild);
+                }
+
+                // Показываем ошибку
+                newErrorSection.style.display = 'block';
+            } else {
+                // Используем существующую секцию
+                errorMessage.textContent = message;
+                errorSection.style.display = 'block';
+            }
+        }
+
+        // Обработка ошибок запросов
+        function handleFetchError(response) {
+            if (!response.ok) {
+                if (response.status === 401) {
+                    throw new Error('unauthorized');
+                }
+                return response.json().then(data => {
+                    throw new Error(data.error || 'Произошла ошибка');
+                });
+            }
+            return response.json();
+        }
+
+        // Проверяем авторизацию при загрузке страницы
+        document.addEventListener('DOMContentLoaded', function() {
+            const token = localStorage.getItem('token');
+            if (token) {
+                showMainSection();
+                loadFiles(currentPath);
+            } else {
+                showLoginSection();
+            }
+        });
+
+        // Получить заголовки с токеном
+        function getAuthHeaders(includeContentType = true) {
+            const token = localStorage.getItem('token');
+            const headers = {
+                'Authorization': `Bearer ${token}`
+            };
+            if (includeContentType) {
+                headers['Content-Type'] = 'application/json';
+            }
+            return headers;
+        }
+
+        // Обработка входа
+        document.getElementById('loginForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+
+            fetch('/login', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ username, password })
+            })
+            .then(response => {
+                if (!response.ok) {
+                    return response.json().then(data => {
+                        throw new Error(data.error || 'Ошибка авторизации');
+                    });
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.token) {
+                    localStorage.setItem('token', data.token);
+                    showMainSection();
+                    loadFiles('.');
+                }
+            })
+            .catch(error => {
+                showError(error.message);
+            });
+        });
+
+        // Обработка выхода
+        document.getElementById('logoutBtn').addEventListener('click', function() {
+            localStorage.removeItem('token');
+            showLoginSection();
+        });
+
+        // Показать секцию входа
+        function showLoginSection() {
+            document.getElementById('loginSection').style.display = 'block';
+            document.getElementById('mainSection').style.display = 'none';
+        }
+
+        // Показать основную секцию
+        function showMainSection() {
+            document.getElementById('loginSection').style.display = 'none';
+            document.getElementById('mainSection').style.display = 'block';
+        }
+
+        // Загрузка списка файлов
+        function loadFiles(path = '.') {
+            const token = localStorage.getItem('token');
+            if (!token) {
+                showLoginSection();
+                return;
+            }
+
+            // Нормализуем путь: заменяем обратные слеши на прямые и декодируем
+            const normalizedPath = decodeURIComponent(path).replace(/\\/g, '//');
+
+            fetch(`/files?path=${encodeURIComponent(normalizedPath)}`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            })
+            .then(handleFetchError)
+            .then(files => {
+                updatePath(normalizedPath);
+                const filesDiv = document.getElementById('files');
+
+                // Убедимся, что files является массивом
+                if (!Array.isArray(files)) {
+                    files = [];
+                }
+
+                if (files.length === 0) {
+                    filesDiv.innerHTML = '<p class="text-muted">Нет файлов</p>';
+                    return;
+                }
+
+                const list = files.map(file => {
+                    const isDirectory = file.isDir;
+                    const icon = isDirectory ?
+                        '<i class="bi bi-folder me-2"></i>' :
+                        '<i class="bi bi-file-earmark me-2"></i>';
+
+                    const size = !isDirectory ? (
+                        file.size < 1024 ? `${file.size} B` :
+                        file.size < 1024 * 1024 ? `${(file.size / 1024).toFixed(1)} KB` :
+                        `${(file.size / (1024 * 1024)).toFixed(1)} MB`
+                    ) : '';
+
+                    // Используем путь из ответа сервера и нормализуем его
+                    const filePath = (file.path || file.name).replace(/\\/g, '/');
+
+                    // Для скачивания используем закодированный путь
+                    const downloadPath = encodeURIComponent(filePath);
+
+                    // Добавляем контекстное меню для всех элементов, кроме '..'
+                    const contextMenuAttrs = file.name !== '..' ?
+                        `data-is-dir="${isDirectory}" data-path="${filePath}" oncontextmenu="showContextMenu(event, this)"` : '';
+
+                    return `
+                        <div class="d-flex justify-content-between align-items-center border-bottom py-2"
+                             ${contextMenuAttrs}>
+                            <div>
+                                ${icon}
+                                ${isDirectory ?
+                                    `<span class="clickable" onclick="loadFiles('${filePath}')">${file.name}</span>` :
+                                    `<a href="/download/${downloadPath}" class="text-decoration-none">${file.name}</a>`
+                                }
+                            </div>
+                            ${size ? `<span class="text-muted small">${size}</span>` : ''}
+                        </div>`;
+                }).join('');
+
+                filesDiv.innerHTML = list;
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                if (error.message === 'unauthorized') {
+                    showLoginSection();
+                } else {
+                    showError(error.message || 'Ошибка загрузки списка файлов');
+                }
+            });
+        }
+
+        // Обработка создания директории
+        document.getElementById('createDirForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+
+            const createDirModal = bootstrap.Modal.getInstance(document.getElementById('createDirModal'));
+            const dirname = document.getElementById('dirname').value.trim();
+            const path = document.getElementById('createDirPath').value;
+
+            if (!dirname) {
+                showError('Введите имя директории');
+                return;
+            }
+
+            // Отправляем JSON вместо form-data
+            fetch('/create-dir', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...getAuthHeaders()
+                },
+                body: JSON.stringify({
+                    dirname: dirname,
+                    path: path
+                })
+            })
+            .then(handleFetchError)
+            .then(data => {
+                if (data.message) {
+                    loadFiles(currentPath);
+                    document.getElementById('dirname').value = '';
+                    createDirModal.hide();
+                    showToast('Успех', 'Директория успешно создана');
+                }
+            })
+            .catch(error => {
+                if (error.message === 'unauthorized') {
+                    showLoginSection();
+                } else {
+                    showError(error.message);
+                }
+            });
+        });
+
+        // Обработка загрузки файла
+        document.getElementById('uploadForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+
+            const formData = new FormData(this);
+            const progressBar = this.querySelector('.progress');
+            const progressBarInner = progressBar.querySelector('.progress-bar');
+            const submitButton = this.querySelector('button[type="submit"]');
+            const file = document.getElementById('file').files[0];
+
+            if (!file) {
+                showError('Выберите файл для загрузки');
+                return;
+            }
+
+            const token = localStorage.getItem('token');
+            if (!token) {
+                showLoginSection();
+                return;
+            }
+
+            // Показываем индикатор загрузки
+            progressBar.classList.remove('d-none');
+            submitButton.disabled = true;
+
+            // Убеждаемся, что путь установлен
+            if (!formData.get('path')) {
+                formData.set('path', '.');
+            }
+
+            fetch('/upload', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                },
+                body: formData
+            })
+            .then(handleFetchError)
+            .then((data) => {
+                if (data.message) {
+                    loadFiles(currentPath);
+                    this.reset();
+                    showToast('Успех', 'Файл успешно загружен');
+                }
+            })
+            .catch(error => {
+                if (error.message === 'unauthorized') {
+                    showLoginSection();
+                } else {
+                    showError(error.message);
+                }
+            })
+            .finally(() => {
+                // Скрываем индикатор загрузки
+                progressBar.classList.add('d-none');
+                progressBarInner.style.width = '0%';
+                submitButton.disabled = false;
+            });
+        });
+
+        // Показать уведомление
+        function showToast(title, message) {
+            const toastHTML = `
+                <div class="toast align-items-center text-white bg-success border-0" role="alert" aria-live="assertive" aria-atomic="true">
+                    <div class="d-flex">
+                        <div class="toast-body">
+                            <strong>${title}</strong><br>
+                            ${message}
+                        </div>
+                        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+                    </div>
+                </div>
+            `;
+
+            const toastContainer = document.createElement('div');
+            toastContainer.className = 'toast-container position-fixed bottom-0 end-0 p-3';
+            toastContainer.innerHTML = toastHTML;
+            document.body.appendChild(toastContainer);
+
+            const toast = new bootstrap.Toast(toastContainer.querySelector('.toast'));
+            toast.show();
+
+            // Удаляем контейнер после скрытия уведомления
+            toastContainer.querySelector('.toast').addEventListener('hidden.bs.toast', () => {
+                toastContainer.remove();
+            });
+        }
+
+        // Обновить путь в интерфейсе
+        function updatePath(path) {
+            currentPath = path;
+
+            // Разбиваем путь на части
+            const parts = path === '.' ? [] : path.split('/');
+            let breadcrumbs = '<span class="clickable" onclick="loadFiles(\'.\')">Корневая директория</span>';
+            let currentLink = '';
+
+            for (let i = 0; i < parts.length; i++) {
+                // Строим путь нарастающим итогом
+                currentLink = parts.slice(0, i + 1).join('/');
+
+                breadcrumbs += ' / ';
+                if (i === parts.length - 1) {
+                    breadcrumbs += `<span>${parts[i]}</span>`;
+                } else {
+                    breadcrumbs += `<span class="clickable" onclick="loadFiles('${currentLink}')">${parts[i]}</span>`;
+                }
+            }
+
+            document.getElementById('currentPath').innerHTML = breadcrumbs;
+            document.getElementById('uploadPath').value = path;
+            document.getElementById('createDirPath').value = path;
+        }
+
+        let contextMenuTarget = null;
+        const contextMenu = document.getElementById('contextMenu');
+        const confirmModal = new bootstrap.Modal(document.getElementById('confirmModal'));
+
+        // Закрытие контекстного меню при клике вне его
+        document.addEventListener('click', function(e) {
+            if (!contextMenu.contains(e.target)) {
+                contextMenu.style.display = 'none';
+            }
+        });
+
+        // Предотвращение стандартного контекстного меню
+        document.addEventListener('contextmenu', function(e) {
+            e.preventDefault();
+        });
+
+        // Показ контекстного меню для файлов и директорий
+        function showContextMenu(e, item) {
+            e.preventDefault();
+
+            // Для файлов и директорий показываем разное меню
+            if (item) {
+                contextMenuTarget = item;
+                const menuItems = contextMenu.querySelectorAll('.context-menu-item');
+                menuItems.forEach(menuItem => {
+                    if (item.dataset.isDir === 'true') {
+                        // Для директорий показываем все опции
+                        menuItem.style.display = 'flex';
+                    } else {
+                        // Для файлов показываем только удаление
+                        menuItem.style.display = menuItem.dataset.action === 'delete' ? 'flex' : 'none';
+                    }
+                });
+            }
+
+            contextMenu.style.display = 'block';
+
+            // Позиционирование меню
+            const clickX = e.clientX;
+            const clickY = e.clientY;
+            const screenW = window.innerWidth;
+            const screenH = window.innerHeight;
+            const menuW = contextMenu.offsetWidth;
+            const menuH = contextMenu.offsetHeight;
+
+            const right = (clickX + menuW > screenW) ? screenW - menuW : clickX;
+            const bottom = (clickY + menuH > screenH) ? screenH - menuH : clickY;
+
+            contextMenu.style.left = right + 'px';
+            contextMenu.style.top = bottom + 'px';
+        }
+
+        // Обработка клика по пункту контекстного меню
+        contextMenu.addEventListener('click', function(e) {
+            const action = e.target.closest('[data-action]')?.dataset.action;
+            if (!action) return;
+
+            switch(action) {
+                case 'create':
+                    showCreateDirDialog(currentPath);
+                    contextMenu.style.display = 'none';
+                    break;
+                case 'delete':
+                    if (!contextMenuTarget) return;
+                    const path = contextMenuTarget.dataset.path;
+                    const name = contextMenuTarget.textContent.trim();
+                    const isDir = contextMenuTarget.dataset.isDir === 'true';
+
+                    document.getElementById('itemType').textContent = isDir ? 'директорию' : 'файл';
+                    document.getElementById('itemToDelete').textContent = name;
+                    confirmModal.show();
+                    contextMenu.style.display = 'none';
+
+                    document.getElementById('confirmDelete').onclick = function() {
+                        if (isDir) {
+                            deleteDirectory(path);
+                        } else {
+                            deleteFile(path);
+                        }
+                        confirmModal.hide();
+                    };
+                    break;
+            }
+        });
+
+        // Функция удаления файла
+        function deleteFile(path) {
+            fetch('/delete-file?path=' + encodeURIComponent(path), {
+                method: 'DELETE',
+                headers: getAuthHeaders()
+            })
+            .then(handleFetchError)
+            .then(data => {
+                if (data.message) {
+                    showToast('Успех', 'Файл успешно удален');
+                    loadFiles(currentPath);
+                }
+            })
+            .catch(error => {
+                if (error.message === 'unauthorized') {
+                    showLoginSection();
+                } else {
+                    showError(error.message);
+                }
+            });
+        }
+
+        // Показать диалог создания директории
+        function showCreateDirDialog(path) {
+            document.getElementById('createDirPath').value = path;
+            document.getElementById('dirname').value = '';
+            const createDirModal = new bootstrap.Modal(document.getElementById('createDirModal'));
+            createDirModal.show();
+        }
+
+        // Функция удаления директории
+        function deleteDirectory(path) {
+            fetch('/delete-dir?path=' + encodeURIComponent(path), {
+                method: 'DELETE',
+                headers: getAuthHeaders()
+            })
+            .then(handleFetchError)
+            .then(data => {
+                if (data.message) {
+                    showToast('Успех', 'Директория успешно удалена');
+                    loadFiles(currentPath);
+                }
+            })
+            .catch(error => {
+                if (error.message === 'unauthorized') {
+                    showLoginSection();
+                } else {
+                    showError(error.message);
+                }
+            });
+        }
+    </script>
+</body>
+</html>

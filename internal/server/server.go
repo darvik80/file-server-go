@@ -1,8 +1,12 @@
 package server
 
 import (
+	"encoding/json"
+	"html/template"
+	"log"
 	"net/http"
 
+	"file-server-go/internal/auth"
 	"file-server-go/internal/config"
 	"file-server-go/internal/handlers"
 	"file-server-go/internal/middleware"
@@ -12,13 +16,22 @@ import (
 type Server struct {
 	config      *config.Config
 	fileHandler *handlers.FileHandler
+	authHandler *handlers.AuthHandler
+	templates   *template.Template
 }
 
 // New создает новый сервер
-func New(cfg *config.Config, fileHandler *handlers.FileHandler) *Server {
+func New(cfg *config.Config) *Server {
+	// Устанавливаем ключ для JWT
+	auth.SetJWTKey(cfg.JWTKey)
+
+	templates := template.Must(template.ParseFiles("web/templates/index.html"))
+
 	return &Server{
 		config:      cfg,
-		fileHandler: fileHandler,
+		fileHandler: handlers.NewFileHandler(cfg.UploadDir),
+		authHandler: handlers.NewAuthHandler(cfg),
+		templates:   templates,
 	}
 }
 
@@ -26,11 +39,17 @@ func New(cfg *config.Config, fileHandler *handlers.FileHandler) *Server {
 func (s *Server) Router() http.Handler {
 	mux := http.NewServeMux()
 
+	// Маршруты авторизации
+	mux.HandleFunc("/login", s.authHandler.Login)
+
 	// Маршруты для работы с файлами
 	mux.HandleFunc("/upload", s.fileHandler.UploadFile)
 	mux.HandleFunc("/upload/raw/", s.fileHandler.UploadRawFile)
 	mux.HandleFunc("/files", s.fileHandler.ListFiles)
 	mux.HandleFunc("/download/", s.fileHandler.DownloadFile)
+	mux.HandleFunc("/create-dir", s.fileHandler.CreateDirectory)
+	mux.HandleFunc("/delete-dir", s.fileHandler.DeleteDirectory)
+	mux.HandleFunc("/delete-file", s.fileHandler.DeleteFile)
 
 	// Статические файлы
 	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("./web/static/"))))
@@ -38,11 +57,31 @@ func (s *Server) Router() http.Handler {
 	// Главная страница
 	mux.HandleFunc("/", s.handleHome)
 
-	// Применяем middleware
-	handler := middleware.CORS(mux)
-	handler = middleware.Logging(handler)
+	// Оборачиваем обработчики в middleware в правильном порядке
+	var handler http.Handler = mux
+	handler = handlePanic(handler)        // Первым идет обработка паники
+	handler = middleware.Logging(handler) // Затем логирование
+	handler = middleware.Auth(handler)    // Потом авторизация
+	handler = middleware.CORS(handler)    // И последним CORS
 
 	return handler
+}
+
+// handlePanic восстанавливает работу после паники
+func handlePanic(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer func() {
+			if err := recover(); err != nil {
+				log.Printf("panic: %v", err)
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusInternalServerError)
+				json.NewEncoder(w).Encode(map[string]string{
+					"error": "Internal Server Error",
+				})
+			}
+		}()
+		next.ServeHTTP(w, r)
+	})
 }
 
 // handleHome обрабатывает главную страницу
@@ -52,46 +91,9 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	html := `
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Файловый сервер</title>
-    <meta charset="utf-8">
-</head>
-<body>
-    <h1>Файловый сервер</h1>
-    
-    <h2>Загрузить файл</h2>
-    <form action="/upload" method="post" enctype="multipart/form-data">
-        <input type="file" name="file" required>
-        <button type="submit">Загрузить</button>
-    </form>
-    
-    <h2>Список файлов</h2>
-    <div id="files"></div>
-    
-    <script>
-        // Загружаем список файлов
-        fetch('/files')
-            .then(response => response.json())
-            .then(files => {
-                const filesDiv = document.getElementById('files');
-                if (files.length === 0) {
-                    filesDiv.innerHTML = '<p>Нет загруженных файлов</p>';
-                    return;
-                }
-                
-                const list = files.map(file => 
-                    '<li><a href="/download/' + file.name + '">' + file.name + '</a> (' + file.size + ' байт)</li>'
-                ).join('');
-                
-                filesDiv.innerHTML = '<ul>' + list + '</ul>';
-            });
-    </script>
-</body>
-</html>`
-
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.Write([]byte(html))
+	if err := s.templates.ExecuteTemplate(w, "index.html", nil); err != nil {
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
 }

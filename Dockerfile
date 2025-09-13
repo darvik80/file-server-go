@@ -1,11 +1,10 @@
 # Этап сборки
-FROM golang:1.21-alpine AS builder
+FROM golang:1.25-alpine AS builder
 
 WORKDIR /app
 
 # Копируем файлы проекта
 COPY go.mod ./
-COPY go.sum ./
 RUN go mod download
 
 COPY . .
@@ -14,7 +13,7 @@ COPY . .
 RUN CGO_ENABLED=0 GOOS=linux go build -o /app/server ./cmd/server
 
 # Финальный этап
-FROM alpine:latest
+FROM alpine:latest AS file-server
 
 WORKDIR /app
 
@@ -23,7 +22,6 @@ RUN mkdir -p /app/uploads
 
 # Копируем бинарный файл из этапа сборки
 COPY --from=builder /app/server .
-COPY --from=builder /app/web/static /app/web/static
 
 # Указываем порт
 EXPOSE 8080
