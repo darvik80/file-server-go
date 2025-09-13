@@ -7,30 +7,38 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
     <style>
+        :root {
+            --primary-color: #0d6efd;
+            --danger-color: #dc3545;
+            --success-color: #198754;
+            --border-color: #dee2e6;
+            --light-bg: #f8f9fa;
+        }
+
         .error-container {
             display: none;
             margin-bottom: 1rem;
         }
         .clickable {
             cursor: pointer;
-            color: #0d6efd;
+            color: var(--primary-color);
             text-decoration: none;
         }
         .clickable:hover {
             text-decoration: underline;
         }
         .current-path {
-            background-color: #f8f9fa;
+            background-color: var(--light-bg);
             padding: 0.5rem 1rem;
             margin-bottom: 1rem;
             border-radius: 0.25rem;
-            border: 1px solid #dee2e6;
+            border: 1px solid var(--border-color);
         }
         .context-menu {
             position: fixed;
             z-index: 1000;
             background: white;
-            border: 1px solid #dee2e6;
+            border: 1px solid var(--border-color);
             border-radius: 0.25rem;
             box-shadow: 0 2px 5px rgba(0,0,0,0.2);
             display: none;
@@ -43,10 +51,10 @@
             gap: 0.5rem;
         }
         .context-menu-item:hover {
-            background-color: #f8f9fa;
+            background-color: var(--light-bg);
         }
         .context-menu-item.dangerous {
-            color: #dc3545;
+            color: var(--danger-color);
         }
         .context-menu-item.dangerous:hover {
             background-color: #fff5f5;
@@ -57,7 +65,7 @@
             align-items: center;
         }
         .context-menu-item.folder {
-            color: #198754;
+            color: var(--success-color);
         }
         .context-menu-item.folder:hover {
             background-color: #f1f9f3;
@@ -72,537 +80,721 @@
         #currentPath > span:last-child:hover {
             text-decoration: none;
         }
+        .file-item {
+            transition: background-color 0.2s ease;
+        }
+        .file-item:hover {
+            background-color: var(--light-bg);
+        }
     </style>
 </head>
 <body>
-    <div class="container py-4">
-        <!-- Секция ошибок -->
-        <div id="errorSection" class="error-container alert alert-danger alert-dismissible fade show" role="alert">
-            <span id="errorMessage"></span>
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-        </div>
+<div class="container py-4">
+    <!-- Секция ошибок -->
+    <div id="errorSection" class="error-container alert alert-danger alert-dismissible fade show" role="alert">
+        <span id="errorMessage"></span>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
 
-        <!-- Секция входа -->
-        <div id="loginSection" class="login-container">
-            <div class="row justify-content-center w-100">
-                <div class="col-md-6 col-lg-4">
-                    <div class="card shadow">
-                        <div class="card-header">
-                            <h5 class="card-title mb-0">Вход в систему</h5>
-                        </div>
-                        <div class="card-body">
-                            <form id="loginForm" class="mb-3">
-                                <div class="mb-3">
-                                    <label for="username" class="form-label">Имя пользователя</label>
-                                    <input type="text" class="form-control" id="username" required>
-                                </div>
-                                <div class="mb-3">
-                                    <label for="password" class="form-label">Пароль</label>
-                                    <input type="password" class="form-control" id="password" required>
-                                </div>
-                                <button type="submit" class="btn btn-primary w-100">Войти</button>
-                            </form>
-                        </div>
+    <!-- Секция входа -->
+    <div id="loginSection" class="login-container">
+        <div class="row justify-content-center w-100">
+            <div class="col-md-6 col-lg-4">
+                <div class="card shadow">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">Вход в систему</h5>
                     </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Основная секция -->
-        <div id="mainSection" style="display: none;">
-            <div class="d-flex justify-content-between align-items-center mb-4">
-                <h1>Файловый сервер</h1>
-                <button id="logoutBtn" class="btn btn-outline-danger">Выйти</button>
-            </div>
-
-            <div class="current-path mb-3">
-                <i class="bi bi-folder2-open me-2"></i>
-                <span id="currentPath">Корневая директория</span>
-            </div>
-
-            <div class="row mb-4">
-                <div class="col-12">
-                    <div class="card h-100">
-                        <div class="card-header">
-                            <h5 class="card-title mb-0">Загрузка файла</h5>
-                        </div>
-                        <div class="card-body">
-                            <form id="uploadForm" class="mb-3">
-                                <input type="hidden" id="uploadPath" name="path" value=".">
-                                <div class="mb-3">
-                                    <label for="file" class="form-label">Выберите файл для загрузки</label>
-                                    <input type="file" class="form-control" id="file" name="file" required>
-                                    <div class="form-text">Максимальный размер файла: 32MB</div>
-                                </div>
-                                <div class="progress mb-3 d-none">
-                                    <div class="progress-bar" role="progressbar" style="width: 0%"></div>
-                                </div>
-                                <button type="submit" class="btn btn-primary">Загрузить</button>
-                            </form>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="card">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5 class="card-title mb-0">Список файлов и директорий</h5>
-                    <button class="btn btn-success btn-sm" onclick="showCreateDirDialog(currentPath)">
-                        <i class="bi bi-folder-plus me-1"></i>
-                        Создать директорию
-                    </button>
-                </div>
-                <div class="card-body">
-                    <div id="files">
-                        <div class="text-center">
-                            <div class="spinner-border" role="status">
-                                <span class="visually-hidden">Загрузка...</span>
+                    <div class="card-body">
+                        <form id="loginForm" class="mb-3">
+                            <div class="mb-3">
+                                <label for="username" class="form-label">Имя пользователя</label>
+                                <input type="text" class="form-control" id="username" required>
                             </div>
-                        </div>
+                            <div class="mb-3">
+                                <label for="password" class="form-label">Пароль</label>
+                                <input type="password" class="form-control" id="password" required>
+                            </div>
+                            <button type="submit" class="btn btn-primary w-100">Войти</button>
+                        </form>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Контекстное меню -->
-    <div id="contextMenu" class="context-menu">
-        <div class="context-menu-item folder" data-action="create">
-            <i class="bi bi-folder-plus"></i>
-            Создать директорию
+    <!-- Основная секция -->
+    <div id="mainSection" style="display: none;">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1>Файловый сервер</h1>
+            <button id="logoutBtn" class="btn btn-outline-danger">Выйти</button>
         </div>
-        <div class="context-menu-item dangerous" data-action="delete">
-            <i class="bi bi-trash"></i>
-            Удалить
-        </div>
-    </div>
 
-    <!-- Модальное окно подтверждения удаления -->
-    <div class="modal fade" id="confirmModal" tabindex="-1">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Подтверждение удаления</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <p>Вы действительно хотите удалить <span id="itemType">директорию</span> "<span id="itemToDelete"></span>"?</p>
-                    <p class="text-danger">Это действие нельзя отменить!</p>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
-                    <button type="button" class="btn btn-danger" id="confirmDelete">Удалить</button>
+        <div class="current-path mb-3">
+            <i class="bi bi-folder2-open me-2"></i>
+            <span id="currentPath">Корневая директория</span>
+        </div>
+
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card h-100">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">Загрузка файла</h5>
+                    </div>
+                    <div class="card-body">
+                        <form id="uploadForm" class="mb-3">
+                            <input type="hidden" id="uploadPath" name="path" value=".">
+                            <div class="mb-3">
+                                <label for="file" class="form-label">Выберите файл для загрузки</label>
+                                <input type="file" class="form-control" id="file" name="file" required>
+                                <div class="form-text">Максимальный размер файла: 32MB</div>
+                            </div>
+                            <div class="progress mb-3 d-none">
+                                <div class="progress-bar" role="progressbar" style="width: 0%"></div>
+                            </div>
+                            <button type="submit" class="btn btn-primary">Загрузить</button>
+                        </form>
+                    </div>
                 </div>
             </div>
         </div>
-    </div>
 
-    <!-- Модальное окно создания директории -->
-    <div class="modal fade" id="createDirModal" tabindex="-1">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Создание директории</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <form id="createDirForm">
-                        <input type="hidden" id="createDirPath" name="path" value=".">
-                        <div class="mb-3">
-                            <label for="dirname" class="form-label">Имя директории</label>
-                            <input type="text" class="form-control" id="dirname" name="dirname" required>
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0">Список файлов и директорий</h5>
+                <button class="btn btn-success btn-sm" id="createDirBtn">
+                    <i class="bi bi-folder-plus me-1"></i>
+                    Создать директорию
+                </button>
+            </div>
+            <div class="card-body">
+                <div id="files">
+                    <div class="text-center">
+                        <div class="spinner-border" role="status">
+                            <span class="visually-hidden">Загрузка...</span>
                         </div>
-                    </form>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
-                    <button type="submit" form="createDirForm" class="btn btn-primary">Создать</button>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
+</div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-    <script>
-        let currentPath = '.';
+<!-- Контекстное меню -->
+<div id="contextMenu" class="context-menu">
+    <div class="context-menu-item folder" data-action="create">
+        <i class="bi bi-folder-plus"></i>
+        Создать директорию
+    </div>
+    <div class="context-menu-item dangerous" data-action="delete">
+        <i class="bi bi-trash"></i>
+        Удалить
+    </div>
+</div>
 
-        // Показать ошибку
-        function showError(message) {
-            const errorSection = document.getElementById('errorSection');
-            const errorMessage = document.getElementById('errorMessage');
+<!-- Модальное окно подтверждения удаления -->
+<div class="modal fade" id="confirmModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Подтверждение удаления</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Вы действительно хотите удалить <span id="itemType">директорию</span> "<span id="itemToDelete"></span>"?</p>
+                <p class="text-danger">Это действие нельзя отменить!</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="button" class="btn btn-danger" id="confirmDelete">Удалить</button>
+            </div>
+        </div>
+    </div>
+</div>
 
-            // Создаем секцию ошибки, если она не существует
-            if (!errorSection || !errorMessage) {
-                // Создаем элементы
-                const newErrorSection = document.createElement('div');
-                newErrorSection.id = 'errorSection';
-                newErrorSection.className = 'error-container alert alert-danger alert-dismissible fade show';
-                newErrorSection.setAttribute('role', 'alert');
+<!-- Модальное окно создания директории -->
+<div class="modal fade" id="createDirModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Создание директории</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="createDirForm">
+                    <input type="hidden" id="createDirPath" name="path" value=".">
+                    <div class="mb-3">
+                        <label for="dirname" class="form-label">Имя директории</label>
+                        <input type="text" class="form-control" id="dirname" name="dirname" required>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="submit" form="createDirForm" class="btn btn-primary">Создать</button>
+            </div>
+        </div>
+    </div>
+</div>
 
-                const newErrorMessage = document.createElement('span');
-                newErrorMessage.id = 'errorMessage';
-                newErrorMessage.textContent = message;
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    // Константы и селекторы
+    const SELECTORS = {
+        ERROR_SECTION: '#errorSection',
+        ERROR_MESSAGE: '#errorMessage',
+        LOGIN_SECTION: '#loginSection',
+        MAIN_SECTION: '#mainSection',
+        CURRENT_PATH: '#currentPath',
+        FILES: '#files',
+        UPLOAD_FORM: '#uploadForm',
+        LOGIN_FORM: '#loginForm',
+        CONTEXT_MENU: '#contextMenu',
+        CREATE_DIR_BTN: '#createDirBtn'
+    };
 
-                const closeButton = document.createElement('button');
-                closeButton.type = 'button';
-                closeButton.className = 'btn-close';
-                closeButton.setAttribute('data-bs-dismiss', 'alert');
-                closeButton.setAttribute('aria-label', 'Close');
+    // Кэш DOM элементов
+    const domCache = {};
 
-                // Собираем элементы
-                newErrorSection.appendChild(newErrorMessage);
-                newErrorSection.appendChild(closeButton);
+    // Утилиты
+    const PathUtils = {
+        normalize(path) {
+            return decodeURIComponent(path).replace(/\\/g, '/');
+        },
+        getFileName(path) {
+            return path.split('/').pop();
+        },
+        getParentPath(path) {
+            const parts = path.split('/');
+            parts.pop();
+            return parts.join('/') || '.';
+        },
+        encodePath(path) {
+            return encodeURIComponent(this.normalize(path));
+        }
+    };
 
-                // Добавляем в начало контейнера
-                const container = document.querySelector('.container');
-                if (container) {
-                    container.insertBefore(newErrorSection, container.firstChild);
-                }
+    // Класс для управления файловым менеджером
+    class FileManager {
+        constructor() {
+            this.currentPath = '.';
+            this.token = localStorage.getItem('token');
+            this.contextMenuTarget = null;
+            this.confirmModal = null;
+            this.createDirModal = null;
+            this.init();
+        }
 
-                // Показываем ошибку
-                newErrorSection.style.display = 'block';
+        init() {
+            this.cacheDomElements();
+            this.bindEvents();
+            this.initModals();
+            this.checkAuth();
+        }
+
+        cacheDomElements() {
+            Object.keys(SELECTORS).forEach(key => {
+                const selector = SELECTORS[key];
+                domCache[selector] = document.querySelector(selector);
+            });
+        }
+
+        bindEvents() {
+            // Логин
+            domCache[SELECTORS.LOGIN_FORM]?.addEventListener('submit', (e) => this.handleLogin(e));
+
+            // Логаут
+            document.getElementById('logoutBtn')?.addEventListener('click', () => this.logout());
+
+            // Загрузка файлов
+            domCache[SELECTORS.UPLOAD_FORM]?.addEventListener('submit', (e) => this.handleUpload(e));
+
+            // Создание директории
+            document.getElementById('createDirForm')?.addEventListener('submit', (e) => this.handleCreateDir(e));
+
+            // Подтверждение удаления
+            document.getElementById('confirmDelete')?.addEventListener('click', () => this.confirmDelete());
+
+            // Кнопка создания директории
+            domCache[SELECTORS.CREATE_DIR_BTN]?.addEventListener('click', () => this.showCreateDirDialog());
+
+            // Контекстное меню
+            domCache[SELECTORS.CONTEXT_MENU]?.addEventListener('click', (e) => this.handleContextMenuClick(e));
+
+            // Закрытие контекстного меню
+            document.addEventListener('click', (e) => this.closeContextMenu(e));
+
+            // Предотвращение стандартного контекстного меню
+            document.addEventListener('contextmenu', (e) => e.preventDefault());
+
+            // Делегирование событий
+            document.addEventListener('click', (e) => this.handleEventDelegation(e));
+        }
+
+        initModals() {
+            this.confirmModal = new bootstrap.Modal(document.getElementById('confirmModal'));
+            this.createDirModal = new bootstrap.Modal(document.getElementById('createDirModal'));
+        }
+
+        checkAuth() {
+            if (this.token) {
+                this.showMainSection();
+                this.loadFiles(this.currentPath);
             } else {
-                // Используем существующую секцию
-                errorMessage.textContent = message;
-                errorSection.style.display = 'block';
+                this.showLoginSection();
             }
         }
 
-        // Обработка ошибок запросов
-        function handleFetchError(response) {
-            if (!response.ok) {
-                if (response.status === 401) {
-                    throw new Error('unauthorized');
-                }
-                return response.json().then(data => {
-                    throw new Error(data.error || 'Произошла ошибка');
-                });
-            }
-            return response.json();
-        }
-
-        // Обработка скачивания файлов с токеном
-        function handleDownload(event, filePath) {
-            event.preventDefault();
-
-            const token = localStorage.getItem('token');
-            if (!token) {
-                showLoginSection();
-                return false;
-            }
-
-            // Используем fetch для скачивания с авторизацией
-            fetch(`/download/${filePath}`, {
-                method: 'GET',
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
-            })
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error('Ошибка скачивания файла');
-                    }
-                    return response.blob();
-                })
-                .then(blob => {
-                    // Создаем URL для скачивания
-                    const url = window.URL.createObjectURL(blob);
-                    const link = document.createElement('a');
-                    link.href = url;
-
-                    // Извлекаем имя файла из пути
-                    const fileName = filePath.split('/').pop();
-                    link.setAttribute('download', decodeURIComponent(fileName));
-
-                    document.body.appendChild(link);
-                    link.click();
-
-                    // Очищаем ресурсы
-                    window.URL.revokeObjectURL(url);
-                    document.body.removeChild(link);
-                })
-                .catch(error => {
-                    if (error.message === 'unauthorized') {
-                        showLoginSection();
-                    } else {
-                        showError(error.message || 'Ошибка при скачивании файла');
-                    }
-                });
-
-            return false;
-        }
-
-        // Проверяем авторизацию при загрузке страницы
-        document.addEventListener('DOMContentLoaded', function() {
-            const token = localStorage.getItem('token');
-            if (token) {
-                showMainSection();
-                loadFiles(currentPath);
-            } else {
-                showLoginSection();
-            }
-        });
-
-        // Получить заголовки с токеном
-        function getAuthHeaders(includeContentType = true) {
-            const token = localStorage.getItem('token');
-            const headers = {
-                'Authorization': `Bearer ${token}`
-            };
-            if (includeContentType) {
-                headers['Content-Type'] = 'application/json';
-            }
-            return headers;
-        }
-
-        // Обработка входа
-        document.getElementById('loginForm').addEventListener('submit', function(e) {
+        // Авторизация
+        async handleLogin(e) {
             e.preventDefault();
 
             const username = document.getElementById('username').value;
             const password = document.getElementById('password').value;
 
-            fetch('/login', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ username, password })
-            })
-            .then(response => {
+            try {
+                const response = await fetch('/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+
                 if (!response.ok) {
-                    return response.json().then(data => {
-                        throw new Error(data.error || 'Ошибка авторизации');
-                    });
+                    const data = await response.json();
+                    throw new Error(data.error || 'Ошибка авторизации');
                 }
-                return response.json();
-            })
-            .then(data => {
+
+                const data = await response.json();
                 if (data.token) {
-                    localStorage.setItem('token', data.token);
-                    showMainSection();
-                    loadFiles('.');
+                    this.token = data.token;
+                    localStorage.setItem('token', this.token);
+                    this.showMainSection();
+                    this.loadFiles('.');
                 }
-            })
-            .catch(error => {
-                showError(error.message);
-            });
-        });
+            } catch (error) {
+                this.showError(error.message);
+            }
+        }
 
-        // Обработка выхода
-        document.getElementById('logoutBtn').addEventListener('click', function() {
+        logout() {
             localStorage.removeItem('token');
-            showLoginSection();
-        });
-
-        // Показать секцию входа
-        function showLoginSection() {
-            document.getElementById('loginSection').style.display = 'block';
-            document.getElementById('mainSection').style.display = 'none';
+            this.token = null;
+            this.showLoginSection();
         }
 
-        // Показать основную секцию
-        function showMainSection() {
-            document.getElementById('loginSection').style.display = 'none';
-            document.getElementById('mainSection').style.display = 'block';
-        }
-
-        // Загрузка списка файлов
-        function loadFiles(path = '.') {
-            const token = localStorage.getItem('token');
-            if (!token) {
-                showLoginSection();
+        // Работа с файлами
+        async loadFiles(path = '.') {
+            if (!this.token) {
+                this.showLoginSection();
                 return;
             }
 
-            // Нормализуем путь: заменяем обратные слеши на прямые и декодируем
-            const normalizedPath = decodeURIComponent(path).replace(/\\/g, '//');
+            const normalizedPath = PathUtils.normalize(path);
 
-            fetch(`/files?path=${encodeURIComponent(normalizedPath)}`, {
-                method: 'GET',
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
-            })
-            .then(handleFetchError)
-            .then(files => {
-                updatePath(normalizedPath);
-                const filesDiv = document.getElementById('files');
+            try {
+                const response = await fetch(`/files?path=${encodeURIComponent(normalizedPath)}`, {
+                    method: 'GET',
+                    headers: { 'Authorization': `Bearer ${this.token}` }
+                });
 
-                // Убедимся, что files является массивом
-                if (!Array.isArray(files)) {
-                    files = [];
+                if (!response.ok) {
+                    if (response.status === 401) throw new Error('unauthorized');
+                    const data = await response.json();
+                    throw new Error(data.error || 'Ошибка загрузки файлов');
                 }
 
-                if (files.length === 0) {
-                    filesDiv.innerHTML = '<p class="text-muted">Нет файлов</p>';
-                    return;
-                }
-
-                const list = files.map(file => {
-                    const isDirectory = file.isDir;
-                    const icon = isDirectory ?
-                        '<i class="bi bi-folder me-2"></i>' :
-                        '<i class="bi bi-file-earmark me-2"></i>';
-
-                    const size = !isDirectory ? (
-                        file.size < 1024 ? `${file.size} B` :
-                        file.size < 1024 * 1024 ? `${(file.size / 1024).toFixed(1)} KB` :
-                        `${(file.size / (1024 * 1024)).toFixed(1)} MB`
-                    ) : '';
-
-                    // Используем путь из ответа сервера и нормализуем его
-                    const filePath = (file.path || file.name).replace(/\\/g, '/');
-
-                    // Для скачивания используем закодированный путь
-                    const downloadPath = encodeURIComponent(filePath);
-
-                    // Добавляем контекстное меню для всех элементов, кроме '..'
-                    const contextMenuAttrs = file.name !== '..' ?
-                        `data-is-dir="${isDirectory}" data-path="${filePath}" oncontextmenu="showContextMenu(event, this)"` : '';
-
-                    return `
-                        <div class="d-flex justify-content-between align-items-center border-bottom py-2"
-                             ${contextMenuAttrs}>
-                            <div>
-                                ${icon}
-                                ${isDirectory ?
-                                    `<span class="clickable" onclick="loadFiles('${filePath}')">${file.name}</span>` :
-                                    `<a href="/download/${downloadPath}" class="text-decoration-none" onclick="return handleDownload(event, '${downloadPath}')">${file.name}</a>`
-                                }
-                            </div>
-                            ${size ? `<span class="text-muted small">${size}</span>` : ''}
-                        </div>`;
-                }).join('');
-
-                filesDiv.innerHTML = list;
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                if (error.message === 'unauthorized') {
-                    showLoginSection();
-                } else {
-                    showError(error.message || 'Ошибка загрузки списка файлов');
-                }
-            });
+                let files = await response.json();
+                this.updatePath(normalizedPath);
+                this.renderFiles(files);
+            } catch (error) {
+                this.handleError(error);
+            }
         }
 
-        // Обработка создания директории
-        document.getElementById('createDirForm').addEventListener('submit', function(e) {
-            e.preventDefault();
+        renderFiles(files) {
+            const filesContainer = domCache[SELECTORS.FILES];
+            if (!filesContainer) return;
 
-            const createDirModal = bootstrap.Modal.getInstance(document.getElementById('createDirModal'));
-            const dirname = document.getElementById('dirname').value.trim();
-            const path = document.getElementById('createDirPath').value;
-
-            if (!dirname) {
-                showError('Введите имя директории');
+            if (!Array.isArray(files) || files.length === 0) {
+                filesContainer.innerHTML = '<p class="text-muted">Нет файлов</p>';
                 return;
             }
 
-            // Отправляем JSON вместо form-data
-            fetch('/create-dir', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    ...getAuthHeaders()
-                },
-                body: JSON.stringify({
-                    dirname: dirname,
-                    path: path
-                })
-            })
-            .then(handleFetchError)
-            .then(data => {
-                if (data.message) {
-                    loadFiles(currentPath);
-                    document.getElementById('dirname').value = '';
-                    createDirModal.hide();
-                    showToast('Успех', 'Директория успешно создана');
-                }
-            })
-            .catch(error => {
-                if (error.message === 'unauthorized') {
-                    showLoginSection();
-                } else {
-                    showError(error.message);
-                }
-            });
-        });
+            const fragment = document.createDocumentFragment();
 
-        // Обработка загрузки файла
-        document.getElementById('uploadForm').addEventListener('submit', function(e) {
+            files.forEach(file => {
+                const div = document.createElement('div');
+                div.className = 'd-flex justify-content-between align-items-center border-bottom py-2 file-item';
+
+                if (file.name !== '..') {
+                    div.setAttribute('data-is-dir', file.isDir);
+                    div.setAttribute('data-path', file.path || file.name);
+                    div.setAttribute('oncontextmenu', `fileManager.showContextMenu(event, this)`);
+                }
+
+                div.innerHTML = this.getFileHTML(file);
+                fragment.appendChild(div);
+            });
+
+            filesContainer.innerHTML = '';
+            filesContainer.appendChild(fragment);
+        }
+
+        getFileHTML(file) {
+            const isDirectory = file.isDir;
+            const icon = isDirectory ?
+                '<i class="bi bi-folder me-2 text-success"></i>' :
+                '<i class="bi bi-file-earmark me-2"></i>';
+
+            const size = !isDirectory ? this.formatFileSize(file.size) : '';
+
+            const filePath = (file.path || file.name).replace(/\\/g, '/');
+            const encodedPath = PathUtils.encodePath(filePath);
+
+            return `
+                    <div>
+                        ${icon}
+                        ${isDirectory ?
+                `<span class="clickable" onclick="fileManager.loadFiles('${filePath}')">${file.name}</span>` :
+                `<a href="#" class="text-decoration-none" onclick="return fileManager.handleDownload(event, '${encodedPath}')">${file.name}</a>`
+            }
+                    </div>
+                    ${size ? `<span class="text-muted small">${size}</span>` : ''}
+                `;
+        }
+
+        formatFileSize(bytes) {
+            if (bytes < 1024) return `${bytes} B`;
+            if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+            return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+        }
+
+        // Загрузка файлов
+        async handleUpload(e) {
             e.preventDefault();
 
-            const formData = new FormData(this);
-            const progressBar = this.querySelector('.progress');
+            const formData = new FormData(e.target);
+            const progressBar = e.target.querySelector('.progress');
             const progressBarInner = progressBar.querySelector('.progress-bar');
-            const submitButton = this.querySelector('button[type="submit"]');
-            const file = document.getElementById('file').files[0];
+            const submitButton = e.target.querySelector('button[type="submit"]');
 
-            if (!file) {
-                showError('Выберите файл для загрузки');
-                return;
-            }
-
-            const token = localStorage.getItem('token');
-            if (!token) {
-                showLoginSection();
-                return;
-            }
-
-            // Показываем индикатор загрузки
-            progressBar.classList.remove('d-none');
-            submitButton.disabled = true;
-
-            // Убеждаемся, что путь установлен
             if (!formData.get('path')) {
                 formData.set('path', '.');
             }
 
-            fetch('/upload', {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                },
-                body: formData
-            })
-            .then(handleFetchError)
-            .then((data) => {
+            progressBar.classList.remove('d-none');
+            submitButton.disabled = true;
+
+            try {
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${this.token}` },
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    if (response.status === 401) throw new Error('unauthorized');
+                    const data = await response.json();
+                    throw new Error(data.error || 'Ошибка загрузки файла');
+                }
+
+                const data = await response.json();
                 if (data.message) {
-                    loadFiles(currentPath);
-                    this.reset();
-                    showToast('Успех', 'Файл успешно загружен');
+                    this.loadFiles(this.currentPath);
+                    e.target.reset();
+                    this.showToast('Успех', 'Файл успешно загружен');
                 }
-            })
-            .catch(error => {
-                if (error.message === 'unauthorized') {
-                    showLoginSection();
-                } else {
-                    showError(error.message);
-                }
-            })
-            .finally(() => {
-                // Скрываем индикатор загрузки
+            } catch (error) {
+                this.handleError(error);
+            } finally {
                 progressBar.classList.add('d-none');
                 progressBarInner.style.width = '0%';
                 submitButton.disabled = false;
-            });
-        });
+            }
+        }
 
-        // Показать уведомление
-        function showToast(title, message) {
+        // Скачивание файлов
+        async handleDownload(event, filePath) {
+            event.preventDefault();
+
+            if (!this.token) {
+                this.showLoginSection();
+                return false;
+            }
+
+            try {
+                const response = await fetch(`/download/${filePath}`, {
+                    method: 'GET',
+                    headers: { 'Authorization': `Bearer ${this.token}` }
+                });
+
+                if (!response.ok) throw new Error('Ошибка скачивания файла');
+
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.setAttribute('download', decodeURIComponent(PathUtils.getFileName(filePath)));
+
+                document.body.appendChild(link);
+                link.click();
+
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(link);
+            } catch (error) {
+                this.handleError(error);
+            }
+
+            return false;
+        }
+
+        // Работа с директориями
+        async handleCreateDir(e) {
+            e.preventDefault();
+
+            const dirname = document.getElementById('dirname').value.trim();
+            const path = document.getElementById('createDirPath').value;
+
+            if (!dirname) {
+                this.showError('Введите имя директории');
+                return;
+            }
+
+            try {
+                const response = await fetch('/create-dir', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${this.token}`
+                    },
+                    body: JSON.stringify({ dirname, path })
+                });
+
+                if (!response.ok) {
+                    if (response.status === 401) throw new Error('unauthorized');
+                    const data = await response.json();
+                    throw new Error(data.error || 'Ошибка создания директории');
+                }
+
+                const data = await response.json();
+                if (data.message) {
+                    this.loadFiles(this.currentPath);
+                    document.getElementById('dirname').value = '';
+                    this.createDirModal.hide();
+                    this.showToast('Успех', 'Директория успешно создана');
+                }
+            } catch (error) {
+                this.handleError(error);
+            }
+        }
+
+        showCreateDirDialog() {
+            document.getElementById('createDirPath').value = this.currentPath;
+            document.getElementById('dirname').value = '';
+            this.createDirModal.show();
+        }
+
+        // Удаление
+        async deleteFile(path) {
+            try {
+                const response = await fetch('/delete-file?path=' + encodeURIComponent(path), {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${this.token}` }
+                });
+
+                if (!response.ok) {
+                    if (response.status === 401) throw new Error('unauthorized');
+                    const data = await response.json();
+                    throw new Error(data.error || 'Ошибка удаления файла');
+                }
+
+                const data = await response.json();
+                if (data.message) {
+                    this.showToast('Успех', 'Файл успешно удален');
+                    this.loadFiles(this.currentPath);
+                }
+            } catch (error) {
+                this.handleError(error);
+            }
+        }
+
+        async deleteDirectory(path) {
+            try {
+                const response = await fetch('/delete-dir?path=' + encodeURIComponent(path), {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${this.token}` }
+                });
+
+                if (!response.ok) {
+                    if (response.status === 401) throw new Error('unauthorized');
+                    const data = await response.json();
+                    throw new Error(data.error || 'Ошибка удаления директории');
+                }
+
+                const data = await response.json();
+                if (data.message) {
+                    this.showToast('Успех', 'Директория успешно удалена');
+                    this.loadFiles(this.currentPath);
+                }
+            } catch (error) {
+                this.handleError(error);
+            }
+        }
+
+        // Контекстное меню
+        showContextMenu(e, item) {
+            e.preventDefault();
+            this.contextMenuTarget = item;
+
+            const menuItems = domCache[SELECTORS.CONTEXT_MENU].querySelectorAll('.context-menu-item');
+            const isDir = item.dataset.isDir === 'true';
+
+            menuItems.forEach(menuItem => {
+                menuItem.style.display = isDir || menuItem.dataset.action === 'delete' ? 'flex' : 'none';
+            });
+
+            const contextMenu = domCache[SELECTORS.CONTEXT_MENU];
+            contextMenu.style.display = 'block';
+
+            // Позиционирование
+            const clickX = e.clientX;
+            const clickY = e.clientY;
+            const screenW = window.innerWidth;
+            const screenH = window.innerHeight;
+            const menuW = contextMenu.offsetWidth;
+            const menuH = contextMenu.offsetHeight;
+
+            contextMenu.style.left = Math.min(clickX, screenW - menuW) + 'px';
+            contextMenu.style.top = Math.min(clickY, screenH - menuH) + 'px';
+        }
+
+        handleContextMenuClick(e) {
+            const action = e.target.closest('[data-action]')?.dataset.action;
+            if (!action) return;
+
+            switch(action) {
+                case 'create':
+                    this.showCreateDirDialog();
+                    this.closeContextMenu();
+                    break;
+                case 'delete':
+                    if (!this.contextMenuTarget) return;
+                    this.prepareDelete();
+                    this.closeContextMenu();
+                    break;
+            }
+        }
+
+        prepareDelete() {
+            const path = this.contextMenuTarget.dataset.path;
+            const name = this.contextMenuTarget.textContent.trim();
+            const isDir = this.contextMenuTarget.dataset.isDir === 'true';
+
+            document.getElementById('itemType').textContent = isDir ? 'директорию' : 'файл';
+            document.getElementById('itemToDelete').textContent = name;
+
+            document.getElementById('confirmDelete').onclick = () => {
+                if (isDir) {
+                    this.deleteDirectory(path);
+                } else {
+                    this.deleteFile(path);
+                }
+                this.confirmModal.hide();
+            };
+
+            this.confirmModal.show();
+        }
+
+        confirmDelete() {
+            if (!this.contextMenuTarget) return;
+            const path = this.contextMenuTarget.dataset.path;
+            const isDir = this.contextMenuTarget.dataset.isDir === 'true';
+
+            if (isDir) {
+                this.deleteDirectory(path);
+            } else {
+                this.deleteFile(path);
+            }
+        }
+
+        closeContextMenu(e) {
+            if (!e || !domCache[SELECTORS.CONTEXT_MENU].contains(e.target)) {
+                domCache[SELECTORS.CONTEXT_MENU].style.display = 'none';
+            }
+        }
+
+        // Делегирование событий
+        handleEventDelegation(e) {
+            // Обработка кликов по хлебным крошкам
+            if (e.target.matches('#currentPath .clickable')) {
+                const path = e.target.dataset.path;
+                if (path) this.loadFiles(path);
+            }
+        }
+
+        // Вспомогательные методы
+        updatePath(path) {
+            this.currentPath = path;
+            const parts = path === '.' ? [] : path.split('/');
+
+            let breadcrumbs = '<span class="clickable" data-path="." onclick="fileManager.loadFiles(\'.\')">Корневая директория</span>';
+            let currentLink = '';
+
+            for (let i = 0; i < parts.length; i++) {
+                currentLink = parts.slice(0, i + 1).join('/');
+                breadcrumbs += ' / ';
+
+                if (i === parts.length - 1) {
+                    breadcrumbs += `<span>${parts[i]}</span>`;
+                } else {
+                    breadcrumbs += `<span class="clickable" data-path="${currentLink}" onclick="fileManager.loadFiles('${currentLink}')">${parts[i]}</span>`;
+                }
+            }
+
+            document.getElementById('currentPath').innerHTML = breadcrumbs;
+            document.getElementById('uploadPath').value = path;
+            document.getElementById('createDirPath').value = path;
+        }
+
+        showMainSection() {
+            domCache[SELECTORS.LOGIN_SECTION].style.display = 'none';
+            domCache[SELECTORS.MAIN_SECTION].style.display = 'block';
+        }
+
+        showLoginSection() {
+            domCache[SELECTORS.LOGIN_SECTION].style.display = 'block';
+            domCache[SELECTORS.MAIN_SECTION].style.display = 'none';
+        }
+
+        showError(message) {
+            const errorSection = domCache[SELECTORS.ERROR_SECTION];
+            const errorMessage = domCache[SELECTORS.ERROR_MESSAGE];
+
+            if (errorSection && errorMessage) {
+                errorMessage.textContent = message;
+                errorSection.style.display = 'block';
+            }
+        }
+
+        handleError(error) {
+            console.error('Error:', error);
+            if (error.message === 'unauthorized') {
+                this.showLoginSection();
+            } else {
+                this.showError(error.message || 'Произошла ошибка');
+            }
+        }
+
+        showToast(title, message) {
             const toastHTML = `
-                <div class="toast align-items-center text-white bg-success border-0" role="alert" aria-live="assertive" aria-atomic="true">
-                    <div class="d-flex">
-                        <div class="toast-body">
-                            <strong>${title}</strong><br>
-                            ${message}
+                    <div class="toast align-items-center text-white bg-success border-0" role="alert">
+                        <div class="d-flex">
+                            <div class="toast-body">
+                                <strong>${title}</strong><br>${message}
+                            </div>
+                            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
                         </div>
-                        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
                     </div>
-                </div>
-            `;
+                `;
 
             const toastContainer = document.createElement('div');
             toastContainer.className = 'toast-container position-fixed bottom-0 end-0 p-3';
@@ -612,174 +804,24 @@
             const toast = new bootstrap.Toast(toastContainer.querySelector('.toast'));
             toast.show();
 
-            // Удаляем контейнер после скрытия уведомления
             toastContainer.querySelector('.toast').addEventListener('hidden.bs.toast', () => {
                 toastContainer.remove();
             });
         }
+    }
 
-        // Обновить путь в интерфейсе
-        function updatePath(path) {
-            currentPath = path;
+    // Инициализация при загрузке страницы
+    let fileManager;
+    document.addEventListener('DOMContentLoaded', () => {
+        fileManager = new FileManager();
+    });
 
-            // Разбиваем путь на части
-            const parts = path === '.' ? [] : path.split('/');
-            let breadcrumbs = '<span class="clickable" onclick="loadFiles(\'.\')">Корневая директория</span>';
-            let currentLink = '';
+    // Глобальные функции для HTML атрибутов
+    window.showContextMenu = function(e, item) {
+        fileManager.showContextMenu(e, item);
+    };
 
-            for (let i = 0; i < parts.length; i++) {
-                // Строим путь нарастающим итогом
-                currentLink = parts.slice(0, i + 1).join('/');
-
-                breadcrumbs += ' / ';
-                if (i === parts.length - 1) {
-                    breadcrumbs += `<span>${parts[i]}</span>`;
-                } else {
-                    breadcrumbs += `<span class="clickable" onclick="loadFiles('${currentLink}')">${parts[i]}</span>`;
-                }
-            }
-
-            document.getElementById('currentPath').innerHTML = breadcrumbs;
-            document.getElementById('uploadPath').value = path;
-            document.getElementById('createDirPath').value = path;
-        }
-
-        let contextMenuTarget = null;
-        const contextMenu = document.getElementById('contextMenu');
-        const confirmModal = new bootstrap.Modal(document.getElementById('confirmModal'));
-
-        // Закрытие контекстного меню при клике вне его
-        document.addEventListener('click', function(e) {
-            if (!contextMenu.contains(e.target)) {
-                contextMenu.style.display = 'none';
-            }
-        });
-
-        // Предотвращение стандартного контекстного меню
-        document.addEventListener('contextmenu', function(e) {
-            e.preventDefault();
-        });
-
-        // Показ контекстного меню для файлов и директорий
-        function showContextMenu(e, item) {
-            e.preventDefault();
-
-            // Для файлов и директорий показываем разное меню
-            if (item) {
-                contextMenuTarget = item;
-                const menuItems = contextMenu.querySelectorAll('.context-menu-item');
-                menuItems.forEach(menuItem => {
-                    if (item.dataset.isDir === 'true') {
-                        // Для директорий показываем все опции
-                        menuItem.style.display = 'flex';
-                    } else {
-                        // Для файлов показываем только удаление
-                        menuItem.style.display = menuItem.dataset.action === 'delete' ? 'flex' : 'none';
-                    }
-                });
-            }
-
-            contextMenu.style.display = 'block';
-
-            // Позиционирование меню
-            const clickX = e.clientX;
-            const clickY = e.clientY;
-            const screenW = window.innerWidth;
-            const screenH = window.innerHeight;
-            const menuW = contextMenu.offsetWidth;
-            const menuH = contextMenu.offsetHeight;
-
-            const right = (clickX + menuW > screenW) ? screenW - menuW : clickX;
-            const bottom = (clickY + menuH > screenH) ? screenH - menuH : clickY;
-
-            contextMenu.style.left = right + 'px';
-            contextMenu.style.top = bottom + 'px';
-        }
-
-        // Обработка клика по пункту контекстного меню
-        contextMenu.addEventListener('click', function(e) {
-            const action = e.target.closest('[data-action]')?.dataset.action;
-            if (!action) return;
-
-            switch(action) {
-                case 'create':
-                    showCreateDirDialog(currentPath);
-                    contextMenu.style.display = 'none';
-                    break;
-                case 'delete':
-                    if (!contextMenuTarget) return;
-                    const path = contextMenuTarget.dataset.path;
-                    const name = contextMenuTarget.textContent.trim();
-                    const isDir = contextMenuTarget.dataset.isDir === 'true';
-
-                    document.getElementById('itemType').textContent = isDir ? 'директорию' : 'файл';
-                    document.getElementById('itemToDelete').textContent = name;
-                    confirmModal.show();
-                    contextMenu.style.display = 'none';
-
-                    document.getElementById('confirmDelete').onclick = function() {
-                        if (isDir) {
-                            deleteDirectory(path);
-                        } else {
-                            deleteFile(path);
-                        }
-                        confirmModal.hide();
-                    };
-                    break;
-            }
-        });
-
-        // Функция удаления файла
-        function deleteFile(path) {
-            fetch('/delete-file?path=' + encodeURIComponent(path), {
-                method: 'DELETE',
-                headers: getAuthHeaders()
-            })
-            .then(handleFetchError)
-            .then(data => {
-                if (data.message) {
-                    showToast('Успех', 'Файл успешно удален');
-                    loadFiles(currentPath);
-                }
-            })
-            .catch(error => {
-                if (error.message === 'unauthorized') {
-                    showLoginSection();
-                } else {
-                    showError(error.message);
-                }
-            });
-        }
-
-        // Показать диалог создания директории
-        function showCreateDirDialog(path) {
-            document.getElementById('createDirPath').value = path;
-            document.getElementById('dirname').value = '';
-            const createDirModal = new bootstrap.Modal(document.getElementById('createDirModal'));
-            createDirModal.show();
-        }
-
-        // Функция удаления директории
-        function deleteDirectory(path) {
-            fetch('/delete-dir?path=' + encodeURIComponent(path), {
-                method: 'DELETE',
-                headers: getAuthHeaders()
-            })
-            .then(handleFetchError)
-            .then(data => {
-                if (data.message) {
-                    showToast('Успех', 'Директория успешно удалена');
-                    loadFiles(currentPath);
-                }
-            })
-            .catch(error => {
-                if (error.message === 'unauthorized') {
-                    showLoginSection();
-                } else {
-                    showError(error.message);
-                }
-            });
-        }
-    </script>
+    window.fileManager = fileManager;
+</script>
 </body>
 </html>

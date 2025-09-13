@@ -1,0 +1,27 @@
+name: Unit Tests
+on: [push]
+
+jobs:
+  run-tests:
+    runs-on: ubuntu-latest
+    permissions:
+      checks: write
+      pull-requests: write # only required if `comment: true` was enabled
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup golang
+        uses: actions/setup-go@v6
+        with:
+          java-version: '21'
+          distribution: 'adopt'
+
+      - name: Run tests
+        run: go test -v ./...
+
+      - name: Report
+        uses: dorny/test-reporter@v2.1.1
+        with:
+          reporter: golang-json       # Format of test results
+
