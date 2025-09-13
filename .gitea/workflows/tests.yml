@@ -19,11 +19,12 @@ jobs:
       - name: Run tests
         run: |
           go mod download
-          go test -v ./...
+          go test ./... -json > testresults.json
 
       - name: Report
         uses: dorny/test-reporter@v2.1.1
         with:
           name: Go Reports
-          reporter: golang-json       # Format of test results
+          reporter: golang-json      # Format of test results
+          path: testresults.json
 
