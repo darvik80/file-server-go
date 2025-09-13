@@ -14,8 +14,7 @@ jobs:
       - name: Setup golang
         uses: actions/setup-go@v6
         with:
-          java-version: '21'
-          distribution: 'adopt'
+          go-version: 1.21
 
       - name: Run tests
         run: go test -v ./...
