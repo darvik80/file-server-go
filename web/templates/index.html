@@ -281,6 +281,57 @@
             return response.json();
         }
 
+        // Обработка скачивания файлов с токеном
+        function handleDownload(event, filePath) {
+            event.preventDefault();
+
+            const token = localStorage.getItem('token');
+            if (!token) {
+                showLoginSection();
+                return false;
+            }
+
+            // Используем fetch для скачивания с авторизацией
+            fetch(`/download/${filePath}`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Ошибка скачивания файла');
+                    }
+                    return response.blob();
+                })
+                .then(blob => {
+                    // Создаем URL для скачивания
+                    const url = window.URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = url;
+
+                    // Извлекаем имя файла из пути
+                    const fileName = filePath.split('/').pop();
+                    link.setAttribute('download', decodeURIComponent(fileName));
+
+                    document.body.appendChild(link);
+                    link.click();
+
+                    // Очищаем ресурсы
+                    window.URL.revokeObjectURL(url);
+                    document.body.removeChild(link);
+                })
+                .catch(error => {
+                    if (error.message === 'unauthorized') {
+                        showLoginSection();
+                    } else {
+                        showError(error.message || 'Ошибка при скачивании файла');
+                    }
+                });
+
+            return false;
+        }
+
         // Проверяем авторизацию при загрузке страницы
         document.addEventListener('DOMContentLoaded', function() {
             const token = localStorage.getItem('token');
@@ -417,7 +468,7 @@
                                 ${icon}
                                 ${isDirectory ?
                                     `<span class="clickable" onclick="loadFiles('${filePath}')">${file.name}</span>` :
-                                    `<a href="/download/${downloadPath}" class="text-decoration-none">${file.name}</a>`
+                                    `<a href="/download/${downloadPath}" class="text-decoration-none" onclick="return handleDownload(event, '${downloadPath}')">${file.name}</a>`
                                 }
                             </div>
                             ${size ? `<span class="text-muted small">${size}</span>` : ''}
