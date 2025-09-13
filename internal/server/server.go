@@ -28,6 +28,7 @@ func (s *Server) Router() http.Handler {
 
 	// Маршруты для работы с файлами
 	mux.HandleFunc("/upload", s.fileHandler.UploadFile)
+	mux.HandleFunc("/upload/raw/", s.fileHandler.UploadRawFile)
 	mux.HandleFunc("/files", s.fileHandler.ListFiles)
 	mux.HandleFunc("/download/", s.fileHandler.DownloadFile)
 

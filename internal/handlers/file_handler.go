@@ -43,7 +43,7 @@ func (h *FileHandler) UploadFile(w http.ResponseWriter, r *http.Request) {
 	}
 	defer file.Close()
 
-	// Создаем файл на диске
+	// Save uploaded file to c.UploadDir
 	filename := header.Filename
 	dst, err := os.Create(filepath.Join(h.uploadDir, filename))
 	if err != nil {
@@ -52,8 +52,46 @@ func (h *FileHandler) UploadFile(w http.ResponseWriter, r *http.Request) {
 	}
 	defer dst.Close()
 
-	// Копируем содержимое
 	_, err = io.Copy(dst, file)
+	if err != nil {
+		http.Error(w, "Ошибка сохранения файла", http.StatusInternalServerError)
+		return
+	}
+
+	// Возвращаем успешный ответ
+	response := map[string]string{
+		"message":  "Файл успешно загружен",
+		"filename": filename,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+}
+
+// UploadRawFile обрабатывает прямую загрузку файла через POST/PUT запрос
+func (h *FileHandler) UploadRawFile(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost && r.Method != http.MethodPut {
+		http.Error(w, "Метод не поддерживается", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Получаем имя файла из пути URL
+	filename := strings.TrimPrefix(r.URL.Path, "/upload/raw/")
+	if filename == "" {
+		http.Error(w, "Имя файла не указано", http.StatusBadRequest)
+		return
+	}
+
+	// Создаем файл
+	dst, err := os.Create(filepath.Join(h.uploadDir, filename))
+	if err != nil {
+		http.Error(w, "Ошибка создания файла", http.StatusInternalServerError)
+		return
+	}
+	defer dst.Close()
+
+	// Копируем содержимое запроса в файл
+	_, err = io.Copy(dst, r.Body)
 	if err != nil {
 		http.Error(w, "Ошибка сохранения файла", http.StatusInternalServerError)
 		return
@@ -111,7 +149,7 @@ func (h *FileHandler) DownloadFile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	filePath := filepath.Join(h.uploadDir, filename)
-	
+
 	// Проверяем существование файла
 	if _, err := os.Stat(filePath); os.IsNotExist(err) {
 		http.Error(w, "Файл не найден", http.StatusNotFound)
