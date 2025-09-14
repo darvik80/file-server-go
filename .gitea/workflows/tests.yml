@@ -44,5 +44,5 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: summary.md
-          path: ${GITHUB_STEP_SUMMARY}
+          path: /var/run/act/workflow/SUMMARY.md
           retention-days: 5
