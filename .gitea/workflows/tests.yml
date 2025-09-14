@@ -1,5 +1,9 @@
 name: Unit Tests
 on: [push]
+permissions:
+  contents: read
+  actions: read
+  checks: write
 
 jobs:
   run-tests:
@@ -31,9 +35,10 @@ jobs:
 
       - name: check results
         run: |
-          printenv
+          echo "## Test Results Summary" >> $GITHUB_STEP_SUMMARY
+          printenv >> $GITHUB_STEP_SUMMARY 
           cat $GITHUB_STEP_SUMMARY
-          cat $GITHUB_OUTPUT
+          cat $GITHUB_OUTPUT          
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v3
