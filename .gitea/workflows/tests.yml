@@ -37,8 +37,8 @@ jobs:
         run: |
           echo "## Test Results Summary" >> $GITHUB_STEP_SUMMARY
           printenv >> $GITHUB_STEP_SUMMARY 
-          cat $GITHUB_STEP_SUMMARY
-          cat $GITHUB_OUTPUT          
+          echo $(cat $GITHUB_STEP_SUMMARY)
+          echo $(cat $GITHUB_OUTPUT)          
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v3
