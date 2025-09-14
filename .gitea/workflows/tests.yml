@@ -27,7 +27,7 @@ jobs:
           name: Go Reports
           reporter: golang-json      # Format of test results
           path: testresults.json
-          use-actions-summary: false
+          use-actions-summary: true
 
       - name: check results
         run: |
