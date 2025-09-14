@@ -19,31 +19,13 @@ jobs:
       - name: Run tests
         run: |
           go mod download
-          go test ./... -json > testresults.json
-
-      - name: Report
-        uses: dorny/test-reporter@v2.1.1
-        with:
-          name: Go Reports
-          reporter: golang-json      # Format of test results
-          path: testresults.json
-          use-actions-summary: true
-
-      - name: check results
-        run: |
-          echo "before: " $(cat /var/run/act/workflow/SUMMARY.md)
-          
-          echo "## Test Results Summary" >> ${GITHUB_STEP_SUMMARY}
-          printenv >> ${GITHUB_STEP_SUMMARY} 
-          echo $(cat ${GITHUB_STEP_SUMMARY})
-          echo $(cat ${GITHUB_OUTPUT})         
-          
-          echo "after: " $(cat /var/run/act/workflow/SUMMARY.md)
+          go get -u github.com/vakenbolt/go-test-report/
+          go test -json | go-test-report
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v3
         with:
-          name: summary.md
-          path: /var/run/act/workflow/SUMMARY.md
+          name: report.html
+          path: test_report.html
           retention-days: 5
           compression-level: 0
