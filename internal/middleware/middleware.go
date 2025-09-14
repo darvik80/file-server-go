@@ -31,7 +31,7 @@ func CORS(next http.Handler) http.Handler {
 func Auth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Пропускаем авторизацию только для логина и корневой страницы
-		if r.URL.Path == "/login" || r.URL.Path == "/" {
+		if r.URL.Path == "/login" || r.URL.Path == "/" || strings.HasPrefix(r.URL.Path, "/js") || strings.HasPrefix(r.URL.Path, "/css") {
 			next.ServeHTTP(w, r)
 			return
 		}

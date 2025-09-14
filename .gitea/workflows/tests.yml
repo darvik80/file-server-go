@@ -27,6 +27,7 @@ jobs:
           name: Go Reports
           reporter: golang-json      # Format of test results
           path: testresults.json
+          use-actions-summary: false
 
       - name: check results
         run: ls -al
@@ -36,11 +37,4 @@ jobs:
         with:
           name: my-artifact
           path: $GITHUB_STEP_SUMMARY
-          retention-days: 5
-
-      - name: Upload Artifact
-        uses: actions/upload-artifact@v3
-        with:
-          name: my-artifact
-          path: $GITHUB_STEP_SUMMARY_MD
           retention-days: 5

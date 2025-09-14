@@ -52,7 +52,8 @@ func (s *Server) Router() http.Handler {
 	mux.HandleFunc("/delete-file", s.fileHandler.DeleteFile)
 
 	// Статические файлы
-	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("./web/static/"))))
+	mux.Handle("/js/", http.StripPrefix("/js/", http.FileServer(http.Dir("./web/js/"))))
+	mux.Handle("/css/", http.StripPrefix("/css/", http.FileServer(http.Dir("./web/css/"))))
 
 	// Главная страница
 	mux.HandleFunc("/", s.handleHome)
