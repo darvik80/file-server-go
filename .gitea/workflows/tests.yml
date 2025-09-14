@@ -35,6 +35,8 @@ jobs:
           printenv >> ${GITHUB_STEP_SUMMARY} 
           echo $(cat ${GITHUB_STEP_SUMMARY})
           echo $(cat ${GITHUB_OUTPUT})         
+          
+          echo "test: " $(cat /var/run/act/workflow/SUMMARY.md)
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v3
