@@ -35,14 +35,14 @@ jobs:
 
       - name: check results
         run: |
-          echo "## Test Results Summary" >> $GITHUB_STEP_SUMMARY
-          printenv >> $GITHUB_STEP_SUMMARY 
-          echo $(cat $GITHUB_STEP_SUMMARY)
-          echo $(cat $GITHUB_OUTPUT)          
+          echo "## Test Results Summary" >> ${GITHUB_STEP_SUMMARY}
+          printenv >> ${GITHUB_STEP_SUMMARY} 
+          echo $(cat ${GITHUB_STEP_SUMMARY})
+          echo $(cat ${GITHUB_OUTPUT})         
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v3
         with:
           name: summary.md
-          path: $GITHUB_STEP_SUMMARY
+          path: ${GITHUB_STEP_SUMMARY}
           retention-days: 5
