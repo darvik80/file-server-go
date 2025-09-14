@@ -20,7 +20,7 @@ jobs:
         run: |
           go mod download
           go get -u github.com/vakenbolt/go-test-report/
-          go test -json | go-test-report
+          go test -json ./... | go-test-report
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v3
