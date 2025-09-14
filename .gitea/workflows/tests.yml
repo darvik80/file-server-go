@@ -30,7 +30,9 @@ jobs:
           use-actions-summary: false
 
       - name: check results
-        run: ls -al
+        run: |
+          ls -al
+          printenv
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v3
