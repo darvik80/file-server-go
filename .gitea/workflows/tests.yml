@@ -1,9 +1,5 @@
 name: Unit Tests
 on: [push]
-permissions:
-  contents: read
-  actions: read
-  checks: write
 
 jobs:
   run-tests:
@@ -46,3 +42,4 @@ jobs:
           name: summary.md
           path: /var/run/act/workflow/SUMMARY.md
           retention-days: 5
+          compression-level: 0
