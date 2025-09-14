@@ -19,7 +19,7 @@ jobs:
       - name: Run tests
         run: |
           go mod download
-          go get -u github.com/vakenbolt/go-test-report/
+          go install github.com/vakenbolt/go-test-report@v0.9.3
           go test -json ./... | go-test-report
 
       - name: Upload Artifact
