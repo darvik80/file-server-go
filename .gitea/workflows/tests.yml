@@ -31,12 +31,14 @@ jobs:
 
       - name: check results
         run: |
+          echo "before: " $(cat /var/run/act/workflow/SUMMARY.md)
+          
           echo "## Test Results Summary" >> ${GITHUB_STEP_SUMMARY}
           printenv >> ${GITHUB_STEP_SUMMARY} 
           echo $(cat ${GITHUB_STEP_SUMMARY})
           echo $(cat ${GITHUB_OUTPUT})         
           
-          echo "test: " $(cat /var/run/act/workflow/SUMMARY.md)
+          echo "after: " $(cat /var/run/act/workflow/SUMMARY.md)
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v3
