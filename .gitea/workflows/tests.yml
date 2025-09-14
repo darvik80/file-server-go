@@ -20,9 +20,8 @@ jobs:
         run: |
           go mod download
           go install github.com/vakenbolt/go-test-report@v0.9.3
-          go test -json ./... | go-test-report -o $GITEA_STEP_SUMMARY
           go test -json ./... | go-test-report
-          echo $(cat $GITEA_STEP_SUMMARY)
+
       - name: Upload Artifact
         uses: actions/upload-artifact@v3
         with:

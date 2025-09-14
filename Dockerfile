@@ -22,6 +22,7 @@ RUN mkdir -p /app/uploads
 
 # Копируем бинарный файл из этапа сборки
 COPY --from=builder /app/server .
+COPY web /app/web
 
 # Указываем порт
 EXPOSE 8080
