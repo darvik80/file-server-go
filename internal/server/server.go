@@ -1,100 +1,102 @@
 package server
 
 import (
-	"encoding/json"
 	"html/template"
-	"log"
 	"net/http"
 
+	"file-server-go/internal/assets"
 	"file-server-go/internal/auth"
 	"file-server-go/internal/config"
+	"file-server-go/internal/database"
 	"file-server-go/internal/handlers"
 	"file-server-go/internal/middleware"
 )
 
-// Server представляет HTTP сервер
+// Server represents HTTP server
 type Server struct {
 	config      *config.Config
 	fileHandler *handlers.FileHandler
 	authHandler *handlers.AuthHandler
+	appHandler  *handlers.AppHandler
 	templates   *template.Template
+	db          *database.DB
 }
 
-// New создает новый сервер
-func New(cfg *config.Config) *Server {
-	// Устанавливаем ключ для JWT
+// New creates new server
+func New(cfg *config.Config, fileHandler *handlers.FileHandler, db *database.DB) *Server {
+	// Set JWT key
 	auth.SetJWTKey(cfg.JWTKey)
 
-	templates := template.Must(template.ParseFiles("web/templates/index.html"))
+	// Load templates from embedded files
+	templateFS := assets.GetTemplateFS()
+	templates, err := template.ParseFS(templateFS, "*.html")
+	if err != nil {
+		panic("Error loading templates: " + err.Error())
+	}
 
 	return &Server{
 		config:      cfg,
-		fileHandler: handlers.NewFileHandler(cfg.UploadDir),
+		fileHandler: fileHandler,
 		authHandler: handlers.NewAuthHandler(cfg),
+		appHandler:  handlers.NewAppHandler(db, cfg.UploadDir),
 		templates:   templates,
+		db:          db,
 	}
 }
 
-// Router настраивает и возвращает HTTP роутер
+// Router configures and returns HTTP router
 func (s *Server) Router() http.Handler {
 	mux := http.NewServeMux()
 
-	// Маршруты авторизации
+	// Authentication route
 	mux.HandleFunc("/login", s.authHandler.Login)
 
-	// Маршруты для работы с файлами
+	// Application registration route
+	mux.HandleFunc("/register-app", s.appHandler.RegisterApp)
+
+	// Application raw file upload route
+	mux.HandleFunc("/upload/raw", s.appHandler.UploadRawFile)
+	mux.HandleFunc("/upload/raw/", s.appHandler.UploadRawFile)
+
+	// File operations routes
 	mux.HandleFunc("/upload", s.fileHandler.UploadFile)
-	mux.HandleFunc("/upload/raw/", s.fileHandler.UploadRawFile)
 	mux.HandleFunc("/files", s.fileHandler.ListFiles)
 	mux.HandleFunc("/download/", s.fileHandler.DownloadFile)
-	mux.HandleFunc("/create-dir", s.fileHandler.CreateDirectory)
-	mux.HandleFunc("/delete-dir", s.fileHandler.DeleteDirectory)
-	mux.HandleFunc("/delete-file", s.fileHandler.DeleteFile)
 
-	// Статические файлы
-	mux.Handle("/js/", http.StripPrefix("/js/", http.FileServer(http.Dir("./web/js/"))))
-	mux.Handle("/css/", http.StripPrefix("/css/", http.FileServer(http.Dir("./web/css/"))))
+	// Embedded static files
+	staticFS := assets.GetStaticFS()
+	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.FS(staticFS))))
 
-	// Главная страница
+	// Main page using embedded template
 	mux.HandleFunc("/", s.handleHome)
 
-	// Оборачиваем обработчики в middleware в правильном порядке
-	var handler http.Handler = mux
-	handler = handlePanic(handler)        // Первым идет обработка паники
-	handler = middleware.Logging(handler) // Затем логирование
-	handler = middleware.Auth(handler)    // Потом авторизация
-	handler = middleware.CORS(handler)    // И последним CORS
+	// Apply middleware in correct order
+	handler := middleware.CORS(mux)
+	handler = middleware.Logging(handler)
+	handler = middleware.AppAuth(s.db)(handler) // Application authentication middleware
+	handler = middleware.Auth(handler)          // User authentication middleware
 
 	return handler
 }
 
-// handlePanic восстанавливает работу после паники
-func handlePanic(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		defer func() {
-			if err := recover(); err != nil {
-				log.Printf("panic: %v", err)
-				w.Header().Set("Content-Type", "application/json")
-				w.WriteHeader(http.StatusInternalServerError)
-				json.NewEncoder(w).Encode(map[string]string{
-					"error": "Internal Server Error",
-				})
-			}
-		}()
-		next.ServeHTTP(w, r)
-	})
-}
-
-// handleHome обрабатывает главную страницу
+// handleHome handles main page using embedded template
 func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path != "/" {
 		http.NotFound(w, r)
 		return
 	}
 
+	// Use embedded template
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := s.templates.ExecuteTemplate(w, "index.html", nil); err != nil {
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+
+	data := struct {
+		Title string
+	}{
+		Title: "File Server",
+	}
+
+	if err := s.templates.ExecuteTemplate(w, "index.html", data); err != nil {
+		http.Error(w, "Template rendering error", http.StatusInternalServerError)
 		return
 	}
 }

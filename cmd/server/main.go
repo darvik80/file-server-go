@@ -5,20 +5,32 @@ import (
 	"net/http"
 
 	"file-server-go/internal/config"
+	"file-server-go/internal/database"
+	"file-server-go/internal/handlers"
 	"file-server-go/internal/server"
 )
 
 func main() {
-	// Загружаем конфигурацию
+	// Load configuration
 	cfg := config.Load()
 
-	// Создаем и запускаем сервер
-	srv := server.New(cfg)
+	// Create database connection
+	db, err := database.New()
+	if err != nil {
+		log.Fatal("Database connection error:", err)
+	}
+	defer db.Close()
 
-	log.Printf("Сервер запущен на порту %s", cfg.Port)
-	log.Printf("Папка для загрузок: %s", cfg.UploadDir)
+	// Create handlers
+	fileHandler := handlers.NewFileHandler(cfg.UploadDir)
+
+	// Create and start server
+	srv := server.New(cfg, fileHandler, db)
+
+	log.Printf("Server started on port %s", cfg.Port)
+	log.Printf("Upload directory: %s", cfg.UploadDir)
 
 	if err := http.ListenAndServe(":"+cfg.Port, srv.Router()); err != nil {
-		log.Fatal("Ошибка запуска сервера:", err)
+		log.Fatal("Server startup error:", err)
 	}
 }

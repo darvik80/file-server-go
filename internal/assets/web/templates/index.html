@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title data-i18n="title">{{.Title}}</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Основная секция -->
+        <div id="mainSection" style="display: none;">
+            <header class="bg-primary text-white p-4 rounded mb-4">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h1 class="display-4" data-i18n="title">{{.Title}}</h1>
+                        <p class="lead">Простой и удобный файловый сервер</p>
+                    </div>
+                    <div class="d-flex align-items-center">
+                        <!-- Переключатель языка -->
+                        <div class="btn-group me-3" role="group">
+                            <button type="button" class="btn btn-light" onclick="translator.setLanguage('ru')" data-i18n="ru">Русский</button>
+                            <button type="button" class="btn btn-light" onclick="translator.setLanguage('en')" data-i18n="en">English</button>
+                        </div>
+                        <button id="logoutBtn" class="btn btn-light" data-i18n="logout">Выйти</button>
+                    </div>
+                </div>
+            </header>
+
+            <main>
+                <!-- Секция загрузки файлов -->
+                <section class="upload-section card mb-4">
+                    <div class="card-header">
+                        <h2 data-i18n="upload">Загрузить файл</h2>
+                    </div>
+                    <div class="card-body">
+                        <div class="upload-area" id="uploadArea">
+                            <div class="upload-content text-center">
+                                <div class="upload-icon display-4">📁</div>
+                                <p class="text-muted" data-i18n="uploadAreaText">Перетащите файлы сюда или нажмите для выбора</p>
+                                <input type="file" id="fileInput" multiple hidden>
+                                <button type="button" class="btn btn-primary" onclick="document.getElementById('fileInput').click()" data-i18n="selectFiles">
+                                    Выбрать файлы
+                                </button>
+                            </div>
+                        </div>
+                        <div class="upload-progress mt-3" id="uploadProgress" style="display: none;">
+                            <div class="progress">
+                                <div class="progress-bar" id="progressFill" role="progressbar" style="width: 0%"></div>
+                            </div>
+                            <span class="progress-text small" id="progressText">0%</span>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Секция управления файлами -->
+                <section class="files-section card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h2 data-i18n="files">Файлы</h2>
+                        <div class="controls">
+                            <button class="btn btn-outline-secondary me-2" onclick="fileManager.refreshFiles()" data-i18n="refresh">
+                                🔄 Обновить
+                            </button>
+                            <button class="btn btn-outline-secondary" onclick="fileManager.toggleView()" data-i18n="view">
+                                📋 Вид
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Поиск и фильтры -->
+                    <div class="card-body">
+                        <div class="search-section mb-3">
+                            <div class="input-group">
+                                <input type="text" id="searchInput" placeholder="Поиск файлов..." class="form-control" data-i18n-attr="placeholder" data-i18n="search">
+                                <select id="sortSelect" class="form-select ms-2">
+                                    <option value="name" data-i18n="name">По имени</option>
+                                    <option value="size" data-i18n="size">По размеру</option>
+                                    <option value="date" data-i18n="date">По дате</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Список файлов -->
+                        <div class="files-container">
+                            <div id="filesList" class="files-list">
+                                <div class="text-center py-4" data-i18n="loading">Загрузка файлов...</div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </main>
+
+            <!-- Модальное окно для предварительного просмотра -->
+            <div id="previewModal" class="modal fade" tabindex="-1">
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h3 id="previewTitle" class="modal-title" data-i18n="previewTitle">Предварительный просмотр</h3>
+                            <button type="button" class="btn-close" onclick="fileManager.closePreview()"></button>
+                        </div>
+                        <div class="modal-body" id="previewContent">
+                            <!-- Содержимое предварительного просмотра -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Уведомления -->
+        <div id="notifications" class="notifications position-fixed top-0 end-0 p-3" style="z-index: 1100;"></div>
+    </div>
+
+    <!-- Модальное окно для логина -->
+    <div class="modal fade" id="loginModal" tabindex="-1" aria-labelledby="loginModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="loginModalLabel" data-i18n="loginTitle">Авторизация</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="loginForm">
+                        <div class="mb-3">
+                            <label for="username" class="form-label" data-i18n="username">Имя пользователя:</label>
+                            <input type="text" class="form-control" id="username" name="username" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="password" class="form-label" data-i18n="password">Пароль:</label>
+                            <input type="password" class="form-control" id="password" name="password" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary" data-i18n="login">Войти</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Подключаем JavaScript -->
+    <script src="/static/js/constants.js"></script>
+    <script src="/static/js/utils.js"></script>
+    <script src="/static/js/api.js"></script>
+    <script src="/static/js/translations.js"></script>
+    <script src="/static/js/fileManager.js"></script>
+    <script src="/static/js/app.js"></script>
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Marked.js for Markdown rendering -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+    <!-- Инициализация переводчика -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            translator.applyTranslations();
+        });
+    </script>
+</body>
+</html>

@@ -6,33 +6,33 @@ import (
 	"os"
 )
 
-// Config содержит конфигурацию приложения
+// Config contains application configuration
 type Config struct {
 	Port        string
 	UploadDir   string
 	JWTKey      string
 	Auth        AuthConfig
-	MaxFileSize int64 // в байтах
+	MaxFileSize int64 // in bytes
 }
 
-// AuthConfig содержит настройки авторизации
+// AuthConfig contains authentication settings
 type AuthConfig struct {
 	Username string
 	Password string
 }
 
-// generateSecretKey генерирует случайный ключ
+// generateSecretKey generates a random key
 func generateSecretKey() string {
-	bytes := make([]byte, 32) // 256 бит
+	bytes := make([]byte, 32) // 256 bits
 	if _, err := rand.Read(bytes); err != nil {
-		panic("Не удалось сгенерировать секретный ключ: " + err.Error())
+		panic("Failed to generate secret key: " + err.Error())
 	}
 	return hex.EncodeToString(bytes)
 }
 
-// Load загружает конфигурацию из переменных окружения
+// Load loads configuration from environment variables
 func Load() *Config {
-	// Генерируем случайный ключ, если не указан в переменных окружения
+	// Generate random key if not specified in environment variables
 	jwtKey := getEnv("JWT_KEY", "")
 	if jwtKey == "" {
 		jwtKey = generateSecretKey()
@@ -46,18 +46,18 @@ func Load() *Config {
 			Username: getEnv("ADMIN_USERNAME", "admin"),
 			Password: getEnv("ADMIN_PASSWORD", "admin"),
 		},
-		MaxFileSize: 10 << 20, // 10MB по умолчанию
+		MaxFileSize: 10 << 20, // 10MB by default
 	}
 
-	// Создаем папку для загрузок если её нет
+	// Create upload directory if it doesn't exist
 	if err := os.MkdirAll(cfg.UploadDir, 0755); err != nil {
-		panic("Не удалось создать папку для загрузок: " + err.Error())
+		panic("Failed to create upload directory: " + err.Error())
 	}
 
 	return cfg
 }
 
-// getEnv возвращает значение переменной окружения или значение по умолчанию
+// getEnv returns environment variable value or default value
 func getEnv(key, defaultValue string) string {
 	if value := os.Getenv(key); value != "" {
 		return value

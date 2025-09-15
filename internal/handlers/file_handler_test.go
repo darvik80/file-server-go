@@ -49,6 +49,10 @@ func TestFileHandler(t *testing.T) {
 		testDeleteFile(t, handler, tempDir)
 	})
 
+	t.Run("PreviewHTMLFile", func(t *testing.T) {
+		testPreviewHTMLFile(t, handler, tempDir)
+	})
+
 	t.Run("ErrorCases", func(t *testing.T) {
 		testErrorCases(t, handler, tempDir)
 	})
@@ -80,6 +84,12 @@ func testUploadFile(t *testing.T, handler *FileHandler, tempDir string) {
 			path:          "../invalid",
 			content:       "Test",
 			expectedError: true,
+		},
+		{
+			name:     "html file upload",
+			filename: "test.html",
+			path:     ".",
+			content:  "<html><body><h1>Test HTML</h1></body></html>",
 		},
 	}
 
@@ -139,6 +149,7 @@ func testListFiles(t *testing.T, handler *FileHandler, tempDir string) {
 		{"file1.txt", false, "content1"},
 		{"subdir", true, ""},
 		{"subdir/file2.txt", false, "content2"},
+		{"test.html", false, "<html><body><h1>Test</h1></body></html>"},
 	}
 
 	for _, tf := range testFiles {
@@ -157,9 +168,9 @@ func testListFiles(t *testing.T, handler *FileHandler, tempDir string) {
 		method   string
 		expected int // ожидаемое количество файлов
 	}{
-		{"root directory", ".", "GET", 3},    // file1.txt + subdir
+		{"root directory", ".", "GET", 4},    // file1.txt + subdir + test.html
 		{"subdirectory", "subdir", "GET", 3}, // file2.txt + ..
-		{"post method", ".", "POST", 3},
+		{"post method", ".", "POST", 4},
 	}
 
 	for _, tt := range tests {
@@ -239,6 +250,7 @@ func testCreateDirectory(t *testing.T, handler *FileHandler, tempDir string) {
 		{"create in root", "newdir1", ".", false},
 		{"create in subdir", "newdir2", "subdir", false},
 		{"invalid chars in name", "invalid/name", ".", false},
+		{"empty dirname", "", ".", true},
 	}
 
 	for _, tt := range tests {
@@ -310,6 +322,18 @@ func testDeleteDirectory(t *testing.T, handler *FileHandler, tempDir string) {
 			t.Errorf("Expected status 404, got %d", resp.StatusCode)
 		}
 	})
+
+	t.Run("delete root directory", func(t *testing.T) {
+		req := httptest.NewRequest("DELETE", "/delete-dir?path=.", nil)
+		w := httptest.NewRecorder()
+
+		handler.DeleteDirectory(w, req)
+
+		resp := w.Result()
+		if resp.StatusCode != http.StatusBadRequest {
+			t.Errorf("Expected status 400, got %d", resp.StatusCode)
+		}
+	})
 }
 
 func testDeleteFile(t *testing.T, handler *FileHandler, tempDir string) {
@@ -346,6 +370,71 @@ func testDeleteFile(t *testing.T, handler *FileHandler, tempDir string) {
 			t.Errorf("Expected status 404, got %d", resp.StatusCode)
 		}
 	})
+
+	t.Run("delete directory as file", func(t *testing.T) {
+		// Создаем тестовую директорию
+		testDir := "dir_as_file"
+		fullPath := filepath.Join(tempDir, testDir)
+		os.MkdirAll(fullPath, 0755)
+
+		req := httptest.NewRequest("DELETE", "/delete-file?path="+testDir, nil)
+		w := httptest.NewRecorder()
+
+		handler.DeleteFile(w, req)
+
+		resp := w.Result()
+		if resp.StatusCode != http.StatusBadRequest {
+			t.Errorf("Expected status 400, got %d", resp.StatusCode)
+		}
+	})
+}
+
+func testPreviewHTMLFile(t *testing.T, handler *FileHandler, tempDir string) {
+	// Создаем тестовый HTML файл
+	htmlContent := "<html><body><h1>Test HTML Preview</h1></body></html>"
+	htmlFile := "test.html"
+	fullPath := filepath.Join(tempDir, htmlFile)
+	os.WriteFile(fullPath, []byte(htmlContent), 0644)
+
+	t.Run("valid html preview", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/download/"+htmlFile, nil)
+		w := httptest.NewRecorder()
+
+		handler.DownloadFile(w, req)
+
+		resp := w.Result()
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("Expected status 200, got %d", resp.StatusCode)
+		}
+
+		content, _ := io.ReadAll(resp.Body)
+		if string(content) != htmlContent {
+			t.Errorf("HTML content doesn't match expected")
+		}
+
+		// Проверяем заголовки
+		contentType := resp.Header.Get("Content-Type")
+		if contentType != "application/octet-stream" {
+			t.Errorf("Expected Content-Type application/octet-stream, got %s", contentType)
+		}
+
+		contentDisposition := resp.Header.Get("Content-Disposition")
+		if !strings.Contains(contentDisposition, "attachment; filename=") {
+			t.Errorf("Expected Content-Disposition with attachment, got %s", contentDisposition)
+		}
+	})
+
+	t.Run("non-existent html file", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/download/nonexistent.html", nil)
+		w := httptest.NewRecorder()
+
+		handler.DownloadFile(w, req)
+
+		resp := w.Result()
+		if resp.StatusCode != http.StatusNotFound {
+			t.Errorf("Expected status 404, got %d", resp.StatusCode)
+		}
+	})
 }
 
 func testErrorCases(t *testing.T, handler *FileHandler, tempDir string) {
@@ -363,6 +452,7 @@ func testErrorCases(t *testing.T, handler *FileHandler, tempDir string) {
 		{"wrong method delete dir", "POST", "/delete-dir?path=test", nil, http.StatusMethodNotAllowed},
 		{"wrong method delete file", "POST", "/delete-file?path=test", nil, http.StatusMethodNotAllowed},
 		{"invalid json create dir", "POST", "/create-dir", strings.NewReader("{invalid}"), http.StatusBadRequest},
+		{"missing file in upload", "POST", "/upload", strings.NewReader(""), http.StatusBadRequest},
 	}
 
 	for _, tt := range tests {
@@ -413,29 +503,54 @@ func TestPathSecurity(t *testing.T) {
 		"..\\windows\\system32",
 		"subdir/../../root",
 		"subdir/../..",
+		"",
+		"/",
+		".",
 	}
 
 	for _, path := range maliciousPaths {
 		t.Run("path_traversal_"+path, func(t *testing.T) {
-			// Тестируем ListFiles
-			req := httptest.NewRequest("GET", "/files?path="+url.QueryEscape(path), nil)
-			w := httptest.NewRecorder()
-			handler.ListFiles(w, req)
+			// Тестируем ListFiles (разрешаем "." как валидный путь для корневой директории)
+			if path != "." {
+				req := httptest.NewRequest("GET", "/files?path="+url.QueryEscape(path), nil)
+				w := httptest.NewRecorder()
+				handler.ListFiles(w, req)
 
-			resp := w.Result()
-			if resp.StatusCode != http.StatusBadRequest && resp.StatusCode != http.StatusForbidden {
-				t.Errorf("Expected 400/403 for path %s, got %d", path, resp.StatusCode)
+				resp := w.Result()
+				if resp.StatusCode != http.StatusBadRequest && resp.StatusCode != http.StatusForbidden {
+					t.Errorf("Expected 400/403 for path %s, got %d", path, resp.StatusCode)
+				}
 			}
 
 			// Тестируем CreateDirectory
 			body, _ := json.Marshal(CreateDirRequest{Dirname: "test", Path: path})
-			req = httptest.NewRequest("POST", "/create-dir", bytes.NewReader(body))
-			w = httptest.NewRecorder()
+			req := httptest.NewRequest("POST", "/create-dir", bytes.NewReader(body))
+			w := httptest.NewRecorder()
 			handler.CreateDirectory(w, req)
+
+			resp := w.Result()
+			if resp.StatusCode != http.StatusBadRequest && resp.StatusCode != http.StatusForbidden {
+				t.Errorf("Expected 400/403 for create dir with path %s, got %d", path, resp.StatusCode)
+			}
+
+			// Тестируем DeleteDirectory
+			req = httptest.NewRequest("DELETE", "/delete-dir?path="+path, nil)
+			w = httptest.NewRecorder()
+			handler.DeleteDirectory(w, req)
 
 			resp = w.Result()
 			if resp.StatusCode != http.StatusBadRequest && resp.StatusCode != http.StatusForbidden {
-				t.Errorf("Expected 400/403 for create dir with path %s, got %d", path, resp.StatusCode)
+				t.Errorf("Expected 400/403 for delete dir with path %s, got %d", path, resp.StatusCode)
+			}
+
+			// Тестируем DeleteFile
+			req = httptest.NewRequest("DELETE", "/delete-file?path="+path, nil)
+			w = httptest.NewRecorder()
+			handler.DeleteFile(w, req)
+
+			resp = w.Result()
+			if resp.StatusCode != http.StatusBadRequest && resp.StatusCode != http.StatusForbidden {
+				t.Errorf("Expected 400/403 for delete file with path %s, got %d", path, resp.StatusCode)
 			}
 		})
 	}

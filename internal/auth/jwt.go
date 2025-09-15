@@ -18,7 +18,7 @@ var (
 	ErrKeyNotSet = errors.New("JWT key not set")
 )
 
-// SetJWTKey устанавливает ключ для подписи JWT токенов
+// SetJWTKey sets key for signing JWT tokens
 func SetJWTKey(key string) {
 	if key == "" {
 		panic("JWT key cannot be empty")
@@ -27,7 +27,7 @@ func SetJWTKey(key string) {
 	log.Printf("JWT key set with length: %d", len(jwtKey))
 }
 
-// GenerateToken создает новый JWT токен
+// GenerateToken creates new JWT token
 func GenerateToken(username string) (string, error) {
 	if len(jwtKey) == 0 {
 		return "", ErrKeyNotSet
@@ -53,17 +53,17 @@ func GenerateToken(username string) (string, error) {
 	return tokenString, nil
 }
 
-// ValidateToken проверяет JWT токен
+// ValidateToken validates JWT token
 func ValidateToken(tokenStr string) (*Claims, error) {
 	if len(jwtKey) == 0 {
 		return nil, ErrKeyNotSet
 	}
 
-	log.Printf("Validating token: %s", tokenStr[:10]) // Логируем только начало токена
+	log.Printf("Validating token: %s", tokenStr[:10]) // Log only beginning of token
 
 	claims := &Claims{}
 	token, err := jwt.ParseWithClaims(tokenStr, claims, func(token *jwt.Token) (interface{}, error) {
-		// Проверяем что используется правильный метод подписи
+		// Check that correct signing method is used
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			log.Printf("Unexpected signing method: %v", token.Method)
 			return nil, errors.New("unexpected signing method")
@@ -85,18 +85,18 @@ func ValidateToken(tokenStr string) (*Claims, error) {
 	return claims, nil
 }
 
-// Claims представляет данные JWT токена
+// Claims represents JWT token data
 type Claims struct {
 	Username string `json:"username"`
 	jwt.RegisteredClaims
 }
 
-// SetUserContext добавляет пользователя в контекст
+// SetUserContext adds user to context
 func SetUserContext(ctx context.Context, username string) context.Context {
 	return context.WithValue(ctx, userContextKey, username)
 }
 
-// GetUserFromContext получает пользователя из контекста
+// GetUserFromContext gets user from context
 func GetUserFromContext(ctx context.Context) string {
 	if username, ok := ctx.Value(userContextKey).(string); ok {
 		return username

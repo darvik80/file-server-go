@@ -30,8 +30,9 @@ func CORS(next http.Handler) http.Handler {
 // Auth проверяет JWT токен
 func Auth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Пропускаем авторизацию только для логина и корневой страницы
-		if r.URL.Path == "/login" || r.URL.Path == "/" || strings.HasPrefix(r.URL.Path, "/js") || strings.HasPrefix(r.URL.Path, "/css") {
+		// Пропускаем авторизацию для логина, корневой страницы и статических файлов
+		if r.URL.Path == "/login" || r.URL.Path == "/" ||
+			strings.HasPrefix(r.URL.Path, "/static/") {
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -74,12 +75,16 @@ func Auth(next http.Handler) http.Handler {
 	})
 }
 
-// Logging логирует запросы
+// Logging добавляет логирование HTTP запросов
 func Logging(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
+
+		// Создаем ResponseWriter для отслеживания статуса
 		lw := &loggingResponseWriter{ResponseWriter: w, statusCode: http.StatusOK}
+
 		next.ServeHTTP(lw, r)
+
 		log.Printf(
 			"%s %s %d %v %s",
 			r.Method,
@@ -91,6 +96,7 @@ func Logging(next http.Handler) http.Handler {
 	})
 }
 
+// loggingResponseWriter оборачивает ResponseWriter для логирования
 type loggingResponseWriter struct {
 	http.ResponseWriter
 	statusCode int
@@ -107,10 +113,8 @@ func (lrw *loggingResponseWriter) WriteHeader(code int) {
 
 func (lrw *loggingResponseWriter) Write(b []byte) (int, error) {
 	if !lrw.written {
-		// If no status has been written yet, assume 200 OK
 		lrw.statusCode = http.StatusOK
 		lrw.written = true
 	}
-	n, err := lrw.ResponseWriter.Write(b)
-	return n, err
+	return lrw.ResponseWriter.Write(b)
 }
