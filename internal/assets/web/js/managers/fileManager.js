@@ -380,9 +380,15 @@ class FileManager {
         }
 
         try {
-            showNotification(translator.get('downloadSuccess', {filename: filename}), 'info');
+            // Формируем полный путь к файлу с учетом текущей директории
+            let fullPath = filename;
+            if (this.currentPath !== '.' && this.currentPath !== '/') {
+                fullPath = this.currentPath + '/' + filename;
+            }
 
-            const blob = await fileAPI.downloadFile(filename);
+            showNotification(translator.get('downloadSuccess', {filename: fullPath}), 'info');
+
+            const blob = await fileAPI.downloadFile(fullPath);
 
             // Создаем ссылку для скачивания
             const url = window.URL.createObjectURL(blob);
@@ -420,17 +426,23 @@ class FileManager {
                 return;
             }
 
+            // Формируем полный путь к файлу с учетом текущей директории
+            let fullPath = filename;
+            if (this.currentPath !== '.' && this.currentPath !== '/') {
+                fullPath = this.currentPath + '/' + filename;
+            }
+
             // Получаем расширение файла
             const ext = PathUtils.getFileExtension(filename).toLowerCase();
 
             // Устанавливаем заголовок модального окна
             const previewTitle = document.getElementById('previewTitle');
             if (previewTitle) {
-                previewTitle.textContent = translator.get('previewTitle', {filename: filename});
+                previewTitle.textContent = translator.get('previewTitle', {filename: fullPath});
             }
 
             // Получаем содержимое файла
-            const blob = await fileAPI.downloadFile(filename);
+            const blob = await fileAPI.downloadFile(fullPath);
 
             // Определяем тип контента
             const contentType = blob.type || 'application/octet-stream';

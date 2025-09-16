@@ -211,7 +211,10 @@ class FileServerAPI {
                 headers['Authorization'] = `Bearer ${this.token}`;
             }
 
-            const response = await fetch(`/download/${encodeURIComponent(filename)}`, {
+            // Убедимся, что путь к файлу правильно закодирован
+            const encodedFilename = filename.split('/').map(part => encodeURIComponent(part)).join('/');
+
+            const response = await fetch(`/download/${encodedFilename}`, {
                 method: 'GET',
                 headers: headers
             });
