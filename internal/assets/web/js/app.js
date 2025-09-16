@@ -25,6 +25,26 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
+    // Обработчики событий для вкладок
+    const usersTab = document.getElementById('users-tab');
+    const appsTab = document.getElementById('apps-tab');
+
+    if (usersTab) {
+        usersTab.addEventListener('shown.bs.tab', function() {
+            if (window.userManager) {
+                window.userManager.refreshUsers();
+            }
+        });
+    }
+
+    if (appsTab) {
+        appsTab.addEventListener('shown.bs.tab', function() {
+            if (window.appManager) {
+                window.appManager.refreshApplications();
+            }
+        });
+    }
+
     // Показываем приветственное сообщение
     setTimeout(() => {
         showNotification('Добро пожаловать в файловый сервер!', 'success');

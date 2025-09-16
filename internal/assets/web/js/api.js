@@ -46,18 +46,60 @@ class FileServerAPI {
         return headers;
     }
 
-    // Получить список файлов
-    async getFiles() {
+    // Получить информацию о текущем пользователе
+    async getUserInfo() {
         try {
             const headers = {};
             if (this.token) {
                 headers['Authorization'] = `Bearer ${this.token}`;
             }
 
-            const response = await fetch('/files', {
+            const response = await fetch('/user-info', {
                 method: 'GET',
                 headers: headers
             });
+
+            if (!response.ok) {
+                if (response.status === 401) {
+                    throw new Error('unauthorized');
+                }
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return await response.json();
+        } catch (error) {
+            console.error('Error fetching user info:', error);
+            throw error;
+        }
+    }
+
+    // Получить список файлов
+    async getFiles(path = null) {
+        try {
+            let url = '/files';
+            const headers = {};
+
+            if (this.token) {
+                headers['Authorization'] = `Bearer ${this.token}`;
+            }
+
+            // Если путь задан, отправляем его в теле POST запроса
+            let response;
+            if (path) {
+                response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        ...headers,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ path: path })
+                });
+            } else {
+                // Если путь не задан, используем GET запрос
+                response = await fetch(url, {
+                    method: 'GET',
+                    headers: headers
+                });
+            }
 
             if (!response.ok) {
                 if (response.status === 401) {
@@ -73,10 +115,21 @@ class FileServerAPI {
     }
 
     // Загрузить файл
-    async uploadFile(file, onProgress = null) {
+    async uploadFile(file, path = null, onProgress = null) {
         return new Promise((resolve, reject) => {
             const formData = new FormData();
             formData.append('file', file);
+
+            // Добавляем путь, если он задан
+            if (path) {
+                formData.append('path', path);
+            }
+
+            // Отладочный вывод для проверки передачи параметра path
+            console.log('Uploading file with path:', path);
+            for (let pair of formData.entries()) {
+                console.log(pair[0] + ': ' + pair[1]);
+            }
 
             const xhr = new XMLHttpRequest();
 

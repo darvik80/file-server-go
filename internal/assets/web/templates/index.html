@@ -31,67 +31,131 @@
                 </div>
             </header>
 
+            <!-- Навигационные вкладки -->
+            <ul class="nav nav-tabs mb-4" id="mainTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="files-tab" data-bs-toggle="tab" data-bs-target="#files" type="button" role="tab" data-i18n="files">Файлы</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="users-tab" data-bs-toggle="tab" data-bs-target="#users" type="button" role="tab" data-i18n="users">Пользователи</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="apps-tab" data-bs-toggle="tab" data-bs-target="#applications" type="button" role="tab" data-i18n="applications">Приложения</button>
+                </li>
+            </ul>
+
             <main>
-                <!-- Секция загрузки файлов -->
-                <section class="upload-section card mb-4">
-                    <div class="card-header">
-                        <h2 data-i18n="upload">Загрузить файл</h2>
-                    </div>
-                    <div class="card-body">
-                        <div class="upload-area" id="uploadArea">
-                            <div class="upload-content text-center">
-                                <div class="upload-icon display-4">📁</div>
-                                <p class="text-muted" data-i18n="uploadAreaText">Перетащите файлы сюда или нажмите для выбора</p>
-                                <input type="file" id="fileInput" multiple hidden>
-                                <button type="button" class="btn btn-primary" onclick="document.getElementById('fileInput').click()" data-i18n="selectFiles">
-                                    Выбрать файлы
-                                </button>
+                <!-- Вкладка файлов -->
+                <div class="tab-content" id="mainTabContent">
+                    <!-- Секция файлов -->
+                    <div class="tab-pane fade show active" id="files" role="tabpanel">
+                        <!-- Секция загрузки файлов -->
+                        <section class="upload-section card mb-4">
+                            <div class="card-header">
+                                <h2 data-i18n="upload">Загрузить файл</h2>
                             </div>
-                        </div>
-                        <div class="upload-progress mt-3" id="uploadProgress" style="display: none;">
-                            <div class="progress">
-                                <div class="progress-bar" id="progressFill" role="progressbar" style="width: 0%"></div>
+                            <div class="card-body">
+                                <div class="upload-area" id="uploadArea">
+                                    <div class="upload-content text-center">
+                                        <div class="upload-icon display-4">📁</div>
+                                        <p class="text-muted" data-i18n="uploadAreaText">Перетащите файлы сюда или нажмите для выбора</p>
+                                        <input type="file" id="fileInput" multiple hidden>
+                                        <button type="button" class="btn btn-primary" onclick="document.getElementById('fileInput').click()" data-i18n="selectFiles">
+                                            Выбрать файлы
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="upload-progress mt-3" id="uploadProgress" style="display: none;">
+                                    <div class="progress">
+                                        <div class="progress-bar" id="progressFill" role="progressbar" style="width: 0%"></div>
+                                    </div>
+                                    <span class="progress-text small" id="progressText">0%</span>
+                                </div>
                             </div>
-                            <span class="progress-text small" id="progressText">0%</span>
-                        </div>
-                    </div>
-                </section>
+                        </section>
 
-                <!-- Секция управления файлами -->
-                <section class="files-section card">
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <h2 data-i18n="files">Файлы</h2>
-                        <div class="controls">
-                            <button class="btn btn-outline-secondary me-2" onclick="fileManager.refreshFiles()" data-i18n="refresh">
-                                🔄 Обновить
-                            </button>
-                            <button class="btn btn-outline-secondary" onclick="fileManager.toggleView()" data-i18n="view">
-                                📋 Вид
-                            </button>
-                        </div>
+                        <!-- Секция управления файлами -->
+                        <section class="files-section card">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h2 data-i18n="files">Файлы</h2>
+                                <div class="controls">
+                                    <button class="btn btn-outline-secondary me-2" onclick="fileManager.refreshFiles()" data-i18n="refresh">
+                                        🔄 Обновить
+                                    </button>
+                                    <button class="btn btn-outline-secondary" onclick="fileManager.toggleView()" data-i18n="view">
+                                        📋 Вид
+                                    </button>
+                                    <button class="btn btn-success" onclick="fileManager.showCreateDirectoryModal()" data-i18n="createDir">Создать папку</button>
+                                </div>
+                            </div>
+
+                            <!-- Поиск и фильтры -->
+                            <div class="card-body">
+                                <div class="search-section mb-3">
+                                    <div class="input-group">
+                                        <input type="text" id="searchInput" placeholder="Поиск файлов..." class="form-control" data-i18n-attr="placeholder" data-i18n="search">
+                                        <select id="sortSelect" class="form-select ms-2">
+                                            <option value="name" data-i18n="name">По имени</option>
+                                            <option value="size" data-i18n="size">По размеру</option>
+                                            <option value="date" data-i18n="date">По дате</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <!-- Навигационная цепочка -->
+                                <nav aria-label="breadcrumb" class="mb-3">
+                                    <ol class="breadcrumb" id="breadcrumb">
+                                        <li class="breadcrumb-item active" aria-current="page" data-i18n="files">Файлы</li>
+                                    </ol>
+                                </nav>
+
+                                <!-- Список файлов -->
+                                <div class="files-container">
+                                    <div id="filesList" class="files-list">
+                                        <div class="text-center py-4" data-i18n="loading">Загрузка файлов...</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
                     </div>
 
-                    <!-- Поиск и фильтры -->
-                    <div class="card-body">
-                        <div class="search-section mb-3">
-                            <div class="input-group">
-                                <input type="text" id="searchInput" placeholder="Поиск файлов..." class="form-control" data-i18n-attr="placeholder" data-i18n="search">
-                                <select id="sortSelect" class="form-select ms-2">
-                                    <option value="name" data-i18n="name">По имени</option>
-                                    <option value="size" data-i18n="size">По размеру</option>
-                                    <option value="date" data-i18n="date">По дате</option>
-                                </select>
+                    <!-- Вкладка пользователей -->
+                    <div class="tab-pane fade" id="users" role="tabpanel">
+                        <section class="users-section card">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h2 data-i18n="users">Пользователи</h2>
+                                <div>
+                                    <button class="btn btn-primary me-2" onclick="userManager.showCreateUserModal()" data-i18n="addUser">Добавить пользователя</button>
+                                    <button class="btn btn-secondary" onclick="userManager.showChangePasswordModal()" data-i18n="changePassword">Изменить пароль</button>
+                                </div>
                             </div>
-                        </div>
-
-                        <!-- Список файлов -->
-                        <div class="files-container">
-                            <div id="filesList" class="files-list">
-                                <div class="text-center py-4" data-i18n="loading">Загрузка файлов...</div>
+                            <div class="card-body">
+                                <div class="users-container">
+                                    <div id="usersList" class="users-list">
+                                        <div class="text-center py-4" data-i18n="loading">Загрузка пользователей...</div>
+                                    </div>
+                                </div>
                             </div>
-                        </div>
+                        </section>
                     </div>
-                </section>
+
+                    <!-- Вкладка приложений -->
+                    <div class="tab-pane fade" id="applications" role="tabpanel">
+                        <section class="apps-section card">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h2 data-i18n="applications">Приложения</h2>
+                                <button class="btn btn-primary" onclick="appManager.showRegisterAppModal()" data-i18n="registerApp">Зарегистрировать приложение</button>
+                            </div>
+                            <div class="card-body">
+                                <div class="apps-container">
+                                    <div id="appsList" class="apps-list">
+                                        <div class="text-center py-4" data-i18n="loading">Загрузка приложений...</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
+                    </div>
+                </div>
             </main>
 
             <!-- Модальное окно для предварительного просмотра -->
@@ -104,6 +168,126 @@
                         </div>
                         <div class="modal-body" id="previewContent">
                             <!-- Содержимое предварительного просмотра -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Модальное окно для создания директории -->
+            <div id="createDirModal" class="modal fade" tabindex="-1">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title" data-i18n="createDir">Создать папку</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <form id="createDirForm">
+                                <div class="mb-3">
+                                    <label for="newDirName" class="form-label" data-i18n="dirName">Имя папки:</label>
+                                    <input type="text" class="form-control" id="newDirName" name="dirname" required>
+                                    <input type="hidden" id="newDirPath" name="path">
+                                </div>
+                                <button type="submit" class="btn btn-primary" data-i18n="createDir">Создать</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Модальное окно для создания пользователя -->
+            <div id="createUserModal" class="modal fade" tabindex="-1">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title" data-i18n="addUser">Добавить пользователя</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <form id="createUserForm">
+                                <div class="mb-3">
+                                    <label for="newUsername" class="form-label" data-i18n="username">Имя пользователя:</label>
+                                    <input type="text" class="form-control" id="newUsername" name="username" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="newUserPassword" class="form-label" data-i18n="password">Пароль:</label>
+                                    <input type="password" class="form-control" id="newUserPassword" name="password" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="userRole" class="form-label" data-i18n="role">Роль:</label>
+                                    <select class="form-select" id="userRole" name="role">
+                                        <option value="reader" data-i18n="readerRole">Читатель</option>
+                                        <option value="writer" data-i18n="writerRole">Писатель</option>
+                                        <option value="admin" data-i18n="adminRole">Администратор</option>
+                                    </select>
+                                </div>
+                                <button type="submit" class="btn btn-primary" data-i18n="addUser">Добавить</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Модальное окно для изменения пароля -->
+            <div id="changePasswordModal" class="modal fade" tabindex="-1">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title" data-i18n="changePassword">Изменить пароль</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <form id="changePasswordForm">
+                                <div class="mb-3">
+                                    <label for="changePasswordUsername" class="form-label" data-i18n="username">Имя пользователя:</label>
+                                    <input type="text" class="form-control" id="changePasswordUsername" name="username" required>
+                                </div>
+                                <div class="mb-3" id="oldPasswordGroup">
+                                    <label for="oldPassword" class="form-label" data-i18n="oldPassword">Старый пароль:</label>
+                                    <input type="password" class="form-control" id="oldPassword" name="old_password" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="changePasswordNewPassword" class="form-label" data-i18n="newPassword">Новый пароль:</label>
+                                    <input type="password" class="form-control" id="changePasswordNewPassword" name="new_password" required>
+                                </div>
+                                <button type="submit" class="btn btn-primary" data-i18n="changePassword">Изменить пароль</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Модальное окно для регистрации приложения -->
+            <div id="registerAppModal" class="modal fade" tabindex="-1">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title" data-i18n="registerApp">Зарегистрировать приложение</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <form id="registerAppForm">
+                                <div class="mb-3">
+                                    <label for="appName" class="form-label" data-i18n="appName">Название приложения:</label>
+                                    <input type="text" class="form-control" id="appName" name="name" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="appDescription" class="form-label" data-i18n="appDescription">Описание:</label>
+                                    <textarea class="form-control" id="appDescription" name="description" rows="3"></textarea>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label" data-i18n="permissions">Разрешения:</label>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="readPermission" name="permissions" value="read" checked>
+                                        <label class="form-check-label" for="readPermission" data-i18n="readPermission">Чтение</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="writePermission" name="permissions" value="write">
+                                        <label class="form-check-label" for="writePermission" data-i18n="writePermission">Запись</label>
+                                    </div>
+                                </div>
+                                <button type="submit" class="btn btn-primary" data-i18n="registerApp">Зарегистрировать</button>
+                            </form>
                         </div>
                     </div>
                 </div>
@@ -145,6 +329,8 @@
     <script src="/static/js/api.js"></script>
     <script src="/static/js/translations.js"></script>
     <script src="/static/js/fileManager.js"></script>
+    <script src="/static/js/userManager.js"></script>
+    <script src="/static/js/appManager.js"></script>
     <script src="/static/js/app.js"></script>
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>

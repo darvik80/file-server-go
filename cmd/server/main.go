@@ -6,7 +6,6 @@ import (
 
 	"file-server-go/internal/config"
 	"file-server-go/internal/database"
-	"file-server-go/internal/handlers"
 	"file-server-go/internal/server"
 )
 
@@ -21,11 +20,8 @@ func main() {
 	}
 	defer db.Close()
 
-	// Create handlers
-	fileHandler := handlers.NewFileHandler(cfg.UploadDir)
-
 	// Create and start server
-	srv := server.New(cfg, fileHandler, db)
+	srv := server.New(cfg, nil, db)
 
 	log.Printf("Server started on port %s", cfg.Port)
 	log.Printf("Upload directory: %s", cfg.UploadDir)

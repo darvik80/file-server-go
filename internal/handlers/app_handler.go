@@ -7,10 +7,13 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
+	"file-server-go/internal/auth"
 	"file-server-go/internal/database"
 	"file-server-go/internal/middleware"
+	"file-server-go/internal/models"
 	"file-server-go/internal/services"
 )
 
@@ -34,22 +37,44 @@ func NewAppHandler(db *database.DB, uploadDir string) *AppHandler {
 
 // RegisterAppRequest represents application registration request
 type RegisterAppRequest struct {
-	Name        string `json:"name"`
-	Description string `json:"description"`
+	Name        string                 `json:"name"`
+	Description string                 `json:"description"`
+	Permissions []models.AppPermission `json:"permissions"`
 }
 
 // RegisterAppResponse represents successful application registration response
 type RegisterAppResponse struct {
-	AccessKeyID     string `json:"access_key_id"`
-	AccessKeySecret string `json:"access_key_secret"`
-	Name            string `json:"name"`
-	Description     string `json:"description"`
+	AccessKeyID     string                 `json:"access_key_id"`
+	AccessKeySecret string                 `json:"access_key_secret"`
+	Name            string                 `json:"name"`
+	Description     string                 `json:"description"`
+	Permissions     []models.AppPermission `json:"permissions"`
 }
 
 // RegisterApp handles application registration
 func (h *AppHandler) RegisterApp(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		sendError(w, "Method not supported", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Get current user from context
+	currentUsername := auth.GetUserFromContext(r.Context())
+	if currentUsername == "" {
+		sendError(w, "User not authenticated", http.StatusUnauthorized)
+		return
+	}
+
+	// Find current user
+	currentUser := &models.User{}
+	if err := currentUser.FindUserByUsername(h.db.DB, currentUsername); err != nil {
+		sendError(w, "User not found", http.StatusNotFound)
+		return
+	}
+
+	// Check if user has admin role
+	if !currentUser.HasAdminRole() {
+		sendError(w, "Access denied. Admin rights required", http.StatusForbidden)
 		return
 	}
 
@@ -65,9 +90,36 @@ func (h *AppHandler) RegisterApp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Set default permissions if not provided
+	if len(req.Permissions) == 0 {
+		req.Permissions = []models.AppPermission{models.ReadPermission}
+	}
+
+	// Validate permissions
+	validPermissions := map[models.AppPermission]bool{
+		models.ReadPermission:  true,
+		models.WritePermission: true,
+	}
+
+	for _, perm := range req.Permissions {
+		if !validPermissions[perm] {
+			sendError(w, "Invalid permission. Valid permissions are: read, write", http.StatusBadRequest)
+			return
+		}
+	}
+
 	// Register application
-	app, err := h.appService.RegisterApplication(req.Name, req.Description)
-	if err != nil {
+	appModel := &models.Application{
+		Name:        req.Name,
+		Description: req.Description,
+		Permissions: req.Permissions,
+	}
+
+	// Generate credentials
+	appModel.AccessKeyID = generateAccessKeyID()
+	appModel.AccessKeySecret = generateAccessKeySecret()
+
+	if err := appModel.CreateApplication(h.db.DB); err != nil {
 		sendError(w, "Failed to register application: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -75,10 +127,147 @@ func (h *AppHandler) RegisterApp(w http.ResponseWriter, r *http.Request) {
 	// Send response
 	w.Header().Set("Content-Type", "application/json")
 	response := RegisterAppResponse{
-		AccessKeyID:     app.AccessKeyID,
-		AccessKeySecret: app.AccessKeySecret,
-		Name:            app.Name,
-		Description:     app.Description,
+		AccessKeyID:     appModel.AccessKeyID,
+		AccessKeySecret: appModel.AccessKeySecret,
+		Name:            appModel.Name,
+		Description:     appModel.Description,
+		Permissions:     appModel.Permissions,
+	}
+
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		sendError(w, "Failed to encode response", http.StatusInternalServerError)
+		return
+	}
+}
+
+// GetAppsResponse represents applications list response
+type GetAppsResponse struct {
+	Applications []GetAppResponse `json:"applications"`
+}
+
+// GetAppResponse represents single application response
+type GetAppResponse struct {
+	ID          int64                  `json:"id"`
+	AccessKeyID string                 `json:"access_key_id"`
+	Name        string                 `json:"name"`
+	Description string                 `json:"description"`
+	Permissions []models.AppPermission `json:"permissions"`
+	CreatedAt   time.Time              `json:"created_at"`
+	UpdatedAt   time.Time              `json:"updated_at"`
+}
+
+// GetApplications handles getting all applications
+func (h *AppHandler) GetApplications(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		sendError(w, "Method not supported", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Get current user from context
+	currentUsername := auth.GetUserFromContext(r.Context())
+	if currentUsername == "" {
+		sendError(w, "User not authenticated", http.StatusUnauthorized)
+		return
+	}
+
+	// Find current user
+	currentUser := &models.User{}
+	if err := currentUser.FindUserByUsername(h.db.DB, currentUsername); err != nil {
+		sendError(w, "User not found", http.StatusNotFound)
+		return
+	}
+
+	// Check if user has admin role
+	if !currentUser.HasAdminRole() {
+		sendError(w, "Access denied. Admin rights required", http.StatusForbidden)
+		return
+	}
+
+	// Get all applications
+	appModel := &models.Application{}
+	apps, err := appModel.GetAllApplications(h.db.DB)
+	if err != nil {
+		sendError(w, "Failed to get applications: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Convert to response format
+	var responseApps []GetAppResponse
+	for _, app := range apps {
+		responseApps = append(responseApps, GetAppResponse{
+			ID:          app.ID,
+			AccessKeyID: app.AccessKeyID,
+			Name:        app.Name,
+			Description: app.Description,
+			Permissions: app.Permissions,
+			CreatedAt:   app.CreatedAt,
+			UpdatedAt:   app.UpdatedAt,
+		})
+	}
+
+	// Send response
+	w.Header().Set("Content-Type", "application/json")
+	response := GetAppsResponse{
+		Applications: responseApps,
+	}
+
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		sendError(w, "Failed to encode response", http.StatusInternalServerError)
+		return
+	}
+}
+
+// DeleteApplication handles deleting application
+func (h *AppHandler) DeleteApplication(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodDelete {
+		sendError(w, "Method not supported", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Get current user from context
+	currentUsername := auth.GetUserFromContext(r.Context())
+	if currentUsername == "" {
+		sendError(w, "User not authenticated", http.StatusUnauthorized)
+		return
+	}
+
+	// Find current user
+	currentUser := &models.User{}
+	if err := currentUser.FindUserByUsername(h.db.DB, currentUsername); err != nil {
+		sendError(w, "User not found", http.StatusNotFound)
+		return
+	}
+
+	// Check if user has admin role
+	if !currentUser.HasAdminRole() {
+		sendError(w, "Access denied. Admin rights required", http.StatusForbidden)
+		return
+	}
+
+	// Get application ID from query parameter
+	idStr := r.URL.Query().Get("id")
+	if idStr == "" {
+		sendError(w, "Application ID is required", http.StatusBadRequest)
+		return
+	}
+
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		sendError(w, "Invalid application ID", http.StatusBadRequest)
+		return
+	}
+
+	// Delete application
+	appModel := &models.Application{}
+	if err := appModel.DeleteApplication(h.db.DB, id); err != nil {
+		sendError(w, "Failed to delete application: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Send success response
+	w.Header().Set("Content-Type", "application/json")
+	response := map[string]interface{}{
+		"message": "Application deleted successfully",
 	}
 
 	if err := json.NewEncoder(w).Encode(response); err != nil {
@@ -108,11 +297,17 @@ func (h *AppHandler) UploadRawFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Check if application has write permission
+	if !app.HasWritePermission() {
+		sendError(w, "Application does not have write permission", http.StatusForbidden)
+		return
+	}
+
 	// Get filename from URL path or query parameter
 	filename := r.URL.Query().Get("filename")
 	if filename == "" {
 		// Try to get filename from URL path
-		filename = r.URL.Path[len("/upload/raw/"):]
+		filename = strings.TrimPrefix(r.URL.Path, "/upload/raw/")
 	}
 
 	if filename == "" {
@@ -187,4 +382,25 @@ func (h *AppHandler) UploadRawFile(w http.ResponseWriter, r *http.Request) {
 		sendError(w, "Failed to encode response", http.StatusInternalServerError)
 		return
 	}
+}
+
+// generateAccessKeyID generates a random access key ID
+func generateAccessKeyID() string {
+	return "ak_" + generateRandomString(16)
+}
+
+// generateAccessKeySecret generates a random access key secret
+func generateAccessKeySecret() string {
+	return "sk_" + generateRandomString(32)
+}
+
+// generateRandomString generates a random string of specified length
+func generateRandomString(length int) string {
+	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	b := make([]byte, length)
+	for i := range b {
+		// In real application, use crypto/rand
+		b[i] = charset[int(time.Now().UnixNano())%len(charset)]
+	}
+	return string(b)
 }

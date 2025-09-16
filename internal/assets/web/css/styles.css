@@ -40,6 +40,18 @@ header p {
     opacity: 0.9;
 }
 
+/* Навигационные вкладки */
+.nav-tabs .nav-link {
+    font-weight: 500;
+    color: #667eea;
+}
+
+.nav-tabs .nav-link.active {
+    color: #495057;
+    background-color: #fff;
+    border-color: #dee2e6 #dee2e6 #fff;
+}
+
 /* Секции */
 section {
     background: white;
@@ -101,6 +113,11 @@ section {
 
 .btn-danger:hover {
     background: #c82333;
+}
+
+.btn-sm {
+    padding: 5px 10px;
+    font-size: 12px;
 }
 
 /* Область загрузки */
@@ -237,6 +254,21 @@ section {
     font-size: 12px;
 }
 
+/* Таблицы */
+.table-responsive {
+    overflow-x: auto;
+}
+
+.table th {
+    background-color: #f8f9fa;
+    font-weight: 600;
+    border-top: none;
+}
+
+.table-hover tbody tr:hover {
+    background-color: rgba(102, 126, 234, 0.05);
+}
+
 /* Модальное окно */
 .modal {
     position: fixed;
@@ -282,6 +314,27 @@ section {
     overflow: auto;
 }
 
+.form-label {
+    font-weight: 500;
+    margin-bottom: 5px;
+    display: block;
+}
+
+.form-control {
+    width: 100%;
+    padding: 10px 15px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    font-size: 14px;
+    margin-bottom: 15px;
+}
+
+.form-control:focus {
+    border-color: #667eea;
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.25);
+}
+
 /* Уведомления */
 .notifications {
     position: fixed;
@@ -311,6 +364,10 @@ section {
 
 .notification.warning {
     border-left-color: #ffc107;
+}
+
+.notification.info {
+    border-left-color: #17a2b8;
 }
 
 @keyframes slideIn {
@@ -454,33 +511,38 @@ section {
     .container {
         padding: 10px;
     }
-    
+
     header h1 {
         font-size: 2rem;
     }
-    
+
     section {
         padding: 20px;
     }
-    
+
     .section-header {
         flex-direction: column;
         align-items: flex-start;
         gap: 15px;
     }
-    
+
     .search-section {
         flex-direction: column;
     }
-    
+
     .file-item {
         flex-direction: column;
         align-items: flex-start;
         gap: 10px;
     }
-    
+
     .file-actions {
         width: 100%;
         justify-content: flex-end;
+    }
+
+    .nav-tabs .nav-link {
+        font-size: 0.9rem;
+        padding: 0.5rem 0.75rem;
     }
 }

@@ -11,6 +11,10 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"file-server-go/internal/auth"
+	"file-server-go/internal/database"
+	"file-server-go/internal/models"
 )
 
 // ErrorResponse represents the structure of an error response
@@ -41,19 +45,53 @@ type CreateDirRequest struct {
 // FileHandler handles file operations
 type FileHandler struct {
 	uploadDir string
+	db        *database.DB
 }
 
 // NewFileHandler creates a new file handler
-func NewFileHandler(uploadDir string) *FileHandler {
+func NewFileHandler(uploadDir string, db *database.DB) *FileHandler {
 	return &FileHandler{
 		uploadDir: uploadDir,
+		db:        db,
 	}
+}
+
+// checkUserRole проверяет роль пользователя и возвращает пользователя
+func (h *FileHandler) checkUserRole(r *http.Request) (*models.User, error) {
+	// Get username from context
+	username := auth.GetUserFromContext(r.Context())
+	if username == "" {
+		return nil, fmt.Errorf("user not authenticated")
+	}
+
+	// Find user in database
+	user := &models.User{}
+	err := user.FindUserByUsername(h.db.DB, username)
+	if err != nil {
+		return nil, fmt.Errorf("user not found")
+	}
+
+	return user, nil
 }
 
 // UploadFile handles file upload
 func (h *FileHandler) UploadFile(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		sendError(w, "Method not supported", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Check user role
+	user, err := h.checkUserRole(r)
+	if err != nil {
+		sendError(w, err.Error(), http.StatusUnauthorized)
+		return
+	}
+
+	// Only users with writer or admin role can upload files
+	// Убираем возможность загрузки файлов для пользователей с ролью Reader
+	if !user.HasWriterRole() {
+		sendError(w, "Access denied. Writer or admin rights required", http.StatusForbidden)
 		return
 	}
 
@@ -67,7 +105,7 @@ func (h *FileHandler) UploadFile(w http.ResponseWriter, r *http.Request) {
 
 	// Increase maximum form and file size
 	maxFileSize := int64(32 << 20) // 32MB
-	err := r.ParseMultipartForm(maxFileSize)
+	err = r.ParseMultipartForm(maxFileSize)
 	if err != nil {
 		log.Printf("Error parsing multipart form: %v", err)
 		sendError(w, fmt.Sprintf("Form parsing error: %v", err), http.StatusBadRequest)
@@ -95,13 +133,18 @@ func (h *FileHandler) UploadFile(w http.ResponseWriter, r *http.Request) {
 
 	// Get path for saving file
 	path := r.FormValue("path")
+	log.Printf("Received path parameter: '%s'", path)
 	if path == "" {
 		path = "."
+		log.Printf("Path was empty, setting to '.'")
+	} else {
+		log.Printf("Using path: '%s'", path)
 	}
 
 	// Clean and normalize path
 	path = filepath.ToSlash(filepath.Clean(path))
 	path = regexp.MustCompile(`\s+`).ReplaceAllString(path, "_")
+	log.Printf("Cleaned path: '%s'", path)
 
 	// Block dangerous paths (allow "." for root directory, but block empty string)
 	if path == "" || path == "/" {
@@ -195,6 +238,20 @@ func (h *FileHandler) UploadRawFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Check user role
+	user, err := h.checkUserRole(r)
+	if err != nil {
+		sendError(w, err.Error(), http.StatusUnauthorized)
+		return
+	}
+
+	// Only users with writer or admin role can upload files
+	// Убираем возможность загрузки файлов для пользователей с ролью Reader
+	if !user.HasWriterRole() {
+		sendError(w, "Access denied. Writer or admin rights required", http.StatusForbidden)
+		return
+	}
+
 	// Get filename from URL path
 	filename := strings.TrimPrefix(r.URL.Path, "/upload/raw/")
 	if filename == "" {
@@ -240,6 +297,13 @@ func (h *FileHandler) ListFiles(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Check user role
+	_, err := h.checkUserRole(r)
+	if err != nil {
+		sendError(w, err.Error(), http.StatusUnauthorized)
+		return
+	}
+
 	var path string
 	if r.Method == http.MethodPost {
 		var req FileRequest
@@ -262,10 +326,10 @@ func (h *FileHandler) ListFiles(w http.ResponseWriter, r *http.Request) {
 	// path может быть "." для корневой директории, что допустимо
 
 	// Decode URL-encoded string and replace invalid characters
-	var err error
-	path, err = url.QueryUnescape(path)
-	if err != nil {
-		log.Printf("Error decoding path: %v", err)
+	var decodeErr error
+	path, decodeErr = url.QueryUnescape(path)
+	if decodeErr != nil {
+		log.Printf("Error decoding path: %v", decodeErr)
 		sendError(w, "Invalid path", http.StatusBadRequest)
 		return
 	}
@@ -370,6 +434,13 @@ func (h *FileHandler) DownloadFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Check user role
+	_, err := h.checkUserRole(r)
+	if err != nil {
+		sendError(w, err.Error(), http.StatusUnauthorized)
+		return
+	}
+
 	filename := strings.TrimPrefix(r.URL.Path, "/download/")
 	if filename == "" {
 		sendError(w, "Filename not specified", http.StatusBadRequest)
@@ -396,6 +467,19 @@ func (h *FileHandler) DownloadFile(w http.ResponseWriter, r *http.Request) {
 func (h *FileHandler) CreateDirectory(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		sendError(w, "Method not supported", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Check user role
+	user, err := h.checkUserRole(r)
+	if err != nil {
+		sendError(w, err.Error(), http.StatusUnauthorized)
+		return
+	}
+
+	// Only users with writer or admin role can create directories
+	if !user.HasWriterRole() {
+		sendError(w, "Access denied. Writer or admin rights required", http.StatusForbidden)
 		return
 	}
 
@@ -501,6 +585,19 @@ func (h *FileHandler) DeleteDirectory(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Check user role
+	user, err := h.checkUserRole(r)
+	if err != nil {
+		sendError(w, err.Error(), http.StatusUnauthorized)
+		return
+	}
+
+	// Only users with writer or admin role can delete directories
+	if !user.HasWriterRole() {
+		sendError(w, "Access denied. Writer or admin rights required", http.StatusForbidden)
+		return
+	}
+
 	path := r.URL.Query().Get("path")
 	if path == "" {
 		sendError(w, "Path not specified", http.StatusBadRequest)
@@ -572,6 +669,19 @@ func (h *FileHandler) DeleteDirectory(w http.ResponseWriter, r *http.Request) {
 func (h *FileHandler) DeleteFile(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodDelete {
 		sendError(w, "Method not supported", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Check user role
+	user, err := h.checkUserRole(r)
+	if err != nil {
+		sendError(w, err.Error(), http.StatusUnauthorized)
+		return
+	}
+
+	// Only users with writer or admin role can delete files
+	if !user.HasWriterRole() {
+		sendError(w, "Access denied. Writer or admin rights required", http.StatusForbidden)
 		return
 	}
 

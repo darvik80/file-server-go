@@ -18,6 +18,7 @@ type Server struct {
 	fileHandler *handlers.FileHandler
 	authHandler *handlers.AuthHandler
 	appHandler  *handlers.AppHandler
+	userHandler *handlers.UserHandler
 	templates   *template.Template
 	db          *database.DB
 }
@@ -36,9 +37,10 @@ func New(cfg *config.Config, fileHandler *handlers.FileHandler, db *database.DB)
 
 	return &Server{
 		config:      cfg,
-		fileHandler: fileHandler,
-		authHandler: handlers.NewAuthHandler(cfg),
+		fileHandler: handlers.NewFileHandler(cfg.UploadDir, db),
+		authHandler: handlers.NewAuthHandler(cfg, db),
 		appHandler:  handlers.NewAppHandler(db, cfg.UploadDir),
+		userHandler: handlers.NewUserHandler(db),
 		templates:   templates,
 		db:          db,
 	}
@@ -50,9 +52,17 @@ func (s *Server) Router() http.Handler {
 
 	// Authentication route
 	mux.HandleFunc("/login", s.authHandler.Login)
+	mux.HandleFunc("/user-info", s.authHandler.GetUserInfo)
 
-	// Application registration route
+	// Application routes
 	mux.HandleFunc("/register-app", s.appHandler.RegisterApp)
+	mux.HandleFunc("/applications", s.appHandler.GetApplications)
+	mux.HandleFunc("/delete-app", s.appHandler.DeleteApplication)
+
+	// User routes
+	mux.HandleFunc("/users", s.userHandler.GetUsers)
+	mux.HandleFunc("/create-user", s.userHandler.CreateUser)
+	mux.HandleFunc("/delete-user", s.userHandler.DeleteUser)
 
 	// Application raw file upload route
 	mux.HandleFunc("/upload/raw", s.appHandler.UploadRawFile)
@@ -62,6 +72,9 @@ func (s *Server) Router() http.Handler {
 	mux.HandleFunc("/upload", s.fileHandler.UploadFile)
 	mux.HandleFunc("/files", s.fileHandler.ListFiles)
 	mux.HandleFunc("/download/", s.fileHandler.DownloadFile)
+	mux.HandleFunc("/create-dir", s.fileHandler.CreateDirectory)
+	mux.HandleFunc("/delete-dir", s.fileHandler.DeleteDirectory)
+	mux.HandleFunc("/delete-file", s.fileHandler.DeleteFile)
 
 	// Embedded static files
 	staticFS := assets.GetStaticFS()

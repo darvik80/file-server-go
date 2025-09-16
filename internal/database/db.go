@@ -41,10 +41,15 @@ func New() (*DB, error) {
 	sqlDB.SetConnMaxLifetime(5 * 60) // 5 minutes
 
 	db := &DB{sqlDB}
-	
+
 	// Run migrations
 	if err := db.runMigrations(); err != nil {
 		return nil, fmt.Errorf("failed to run migrations: %w", err)
+	}
+
+	// Create default admin user if users table is empty
+	if err := db.createDefaultAdminUser(); err != nil {
+		log.Printf("Warning: failed to create default admin user: %v", err)
 	}
 
 	log.Printf("Connected to database at %s", dbPath)
@@ -53,12 +58,13 @@ func New() (*DB, error) {
 
 // runMigrations creates database tables if they don't exist
 func (db *DB) runMigrations() error {
-	// Create users table
+	// Create users table with role column
 	usersTable := `
 	CREATE TABLE IF NOT EXISTS users (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		username TEXT UNIQUE NOT NULL,
 		password TEXT NOT NULL,
+		role TEXT NOT NULL DEFAULT 'reader',
 		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 	);`
 
@@ -67,7 +73,14 @@ func (db *DB) runMigrations() error {
 		return fmt.Errorf("failed to create users table: %w", err)
 	}
 
-	// Create applications table
+	// Add role column to existing users table if it doesn't exist
+	_, err = db.Exec("ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'reader'")
+	if err != nil {
+		// Column might already exist, ignore error
+		log.Printf("Note: role column might already exist in users table")
+	}
+
+	// Create applications table with permissions column
 	appsTable := `
 	CREATE TABLE IF NOT EXISTS applications (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -75,6 +88,7 @@ func (db *DB) runMigrations() error {
 		access_key_secret TEXT NOT NULL,
 		name TEXT NOT NULL,
 		description TEXT,
+		permissions TEXT NOT NULL DEFAULT 'read',
 		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 		updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 	);`
@@ -82,6 +96,13 @@ func (db *DB) runMigrations() error {
 	_, err = db.Exec(appsTable)
 	if err != nil {
 		return fmt.Errorf("failed to create applications table: %w", err)
+	}
+
+	// Add permissions column to existing applications table if it doesn't exist
+	_, err = db.Exec("ALTER TABLE applications ADD COLUMN permissions TEXT NOT NULL DEFAULT 'read'")
+	if err != nil {
+		// Column might already exist, ignore error
+		log.Printf("Note: permissions column might already exist in applications table")
 	}
 
 	// Create files table for tracking uploaded files
@@ -116,6 +137,36 @@ func (db *DB) runMigrations() error {
 		}
 	}
 
+	return nil
+}
+
+// createDefaultAdminUser creates default admin user if users table is empty
+func (db *DB) createDefaultAdminUser() error {
+	// Check if users table is empty
+	var count int
+	err := db.QueryRow("SELECT COUNT(*) FROM users").Scan(&count)
+	if err != nil {
+		return fmt.Errorf("failed to count users: %w", err)
+	}
+
+	// If users table is not empty, do nothing
+	if count > 0 {
+		return nil
+	}
+
+	// Create default admin user
+	_, err = db.Exec(
+		"INSERT INTO users (username, password, role, created_at) VALUES (?, ?, ?, ?)",
+		"admin",
+		"admin",
+		"admin",
+		"CURRENT_TIMESTAMP",
+	)
+	if err != nil {
+		return fmt.Errorf("failed to create default admin user: %w", err)
+	}
+
+	log.Println("Created default admin user (admin:admin)")
 	return nil
 }
 
