@@ -1,4 +1,7 @@
 // Основной класс для управления файлами с поддержкой авторизации
+// Убираем import, так как файлы подключаются через HTML
+
+// import { renderFiles, updateBreadcrumb } from '../components/fileRenderer.js';
 
 class FileManager {
     constructor() {
@@ -105,7 +108,19 @@ class FileManager {
 
     // Показать модальное окно логина
     showLoginModal() {
-        const loginModal = new bootstrap.Modal(document.getElementById('loginModal'));
+        const loginModalElement = document.getElementById('loginModal');
+        const loginModal = new bootstrap.Modal(loginModalElement);
+
+        // Удаляем aria-hidden атрибут при открытии модального окна
+        loginModalElement.addEventListener('shown.bs.modal', function () {
+            loginModalElement.removeAttribute('aria-hidden');
+        });
+
+        // Добавляем aria-hidden атрибут при закрытии модального окна
+        loginModalElement.addEventListener('hidden.bs.modal', function () {
+            loginModalElement.setAttribute('aria-hidden', 'true');
+        });
+
         loginModal.show();
     }
 
@@ -252,51 +267,8 @@ class FileManager {
     // Обновление навигационной цепочки (breadcrumb)
     updateBreadcrumb() {
         const breadcrumb = document.getElementById('breadcrumb');
-        if (!breadcrumb) return;
-
-        // Очищаем breadcrumb
-        breadcrumb.innerHTML = '';
-
-        // Если мы в корневой директории, показываем только "Файлы"
-        if (this.currentPath === '.' || this.currentPath === '/') {
-            breadcrumb.innerHTML = `<li class="breadcrumb-item active" aria-current="page">${translator.get('files')}</li>`;
-            return;
-        }
-
-        // Разбиваем путь на части
-        const pathParts = this.currentPath.split('/');
-
-        // Добавляем ссылку на корневую директорию
-        const rootItem = document.createElement('li');
-        rootItem.className = 'breadcrumb-item';
-        rootItem.innerHTML = `<a href="#" onclick="fileManager.navigateToFolder('.')">${translator.get('files')}</a>`;
-        breadcrumb.appendChild(rootItem);
-
-        // Добавляем промежуточные директории
-        let pathSoFar = '';
-        for (let i = 0; i < pathParts.length; i++) {
-            if (pathParts[i] === '') continue;
-
-            if (pathSoFar === '') {
-                pathSoFar = pathParts[i];
-            } else {
-                pathSoFar += '/' + pathParts[i];
-            }
-
-            const item = document.createElement('li');
-            item.className = 'breadcrumb-item';
-
-            // Для последнего элемента делаем его активным (без ссылки)
-            if (i === pathParts.length - 1) {
-                item.className += ' active';
-                item.setAttribute('aria-current', 'page');
-                item.textContent = pathParts[i];
-            } else {
-                item.innerHTML = `<a href="#" onclick="fileManager.navigateToFolder('${pathSoFar}')">${pathParts[i]}</a>`;
-            }
-
-            breadcrumb.appendChild(item);
-        }
+        // Используем глобальную функцию
+        updateBreadcrumb(breadcrumb, this.currentPath);
     }
 
     // Переход в папку
@@ -396,79 +368,8 @@ class FileManager {
     // Рендеринг списка файлов
     renderFiles() {
         const container = document.getElementById('filesList');
-
-        if (this.filteredFiles.length === 0) {
-            container.innerHTML = this.searchTerm ?
-                `<div class="text-center py-4">${translator.get('noFilesFound')}</div>` :
-                `<div class="text-center py-4">${translator.get('noFiles')}</div>`;
-            return;
-        }
-
-        // Устанавливаем класс контейнера в зависимости от режима отображения
-        if (this.currentView === 'grid') {
-            container.className = 'row g-3';
-        } else {
-            container.className = 'files-list';
-        }
-
-        const filesHTML = this.filteredFiles.map(file => this.createFileHTML(file)).join('');
-        container.innerHTML = filesHTML;
-
-        // Применяем переводы к новым элементам
-        translator.applyTranslations();
-    }
-
-    // Создание HTML для файла
-    createFileHTML(file) {
-        const icon = PathUtils.getFileIcon(file.name, file.isDir);
-        const size = formatFileSize(file.size || 0);
-        const canPreviewFile = canPreview(file.name);
-
-        if (this.currentView === 'grid') {
-            // Режим сетки
-            return `
-                <div class="file-item col-md-4 mb-3">
-                    <div class="card h-100">
-                        <div class="card-body d-flex flex-column">
-                            <div class="text-center mb-3">
-                                <div class="file-icon" style="font-size: 2rem;">${icon}</div>
-                            </div>
-                            <h5 class="card-title text-truncate">${file.name}</h5>
-                            <p class="card-text text-muted">${size}</p>
-                            <div class="mt-auto">
-                                <div class="file-actions d-flex justify-content-center gap-2">
-                                    ${file.name === '..' ? 
-                                        `<button class="btn btn-secondary btn-sm" onclick="fileManager.navigateToFolder('${file.path}')">${translator.get('back')}</button>` :
-                                        file.isDir ? 
-                                            `<button class="btn btn-primary btn-sm" onclick="fileManager.navigateToFolder('${file.path}')">${translator.get('open')}</button>` : 
-                                            `${canPreviewFile ? `<button class="btn btn-secondary btn-sm" onclick="fileManager.previewFile('${file.name}')">${translator.get('preview')}</button>` : ''}
-                                            <button class="btn btn-primary btn-sm" onclick="fileManager.downloadFile('${file.name}')">${translator.get('download')}</button>`}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            `;
-        } else {
-            // Режим списка (по умолчанию)
-            return `
-                <div class="file-item">
-                    <div class="file-icon">${icon}</div>
-                    <div class="file-info">
-                        <div class="file-name">${file.name}</div>
-                        <div class="file-meta">${size}</div>
-                    </div>
-                    <div class="file-actions">
-                        ${file.name === '..' ? 
-                            `<button class="btn btn-secondary" onclick="fileManager.navigateToFolder('${file.path}')">${translator.get('back')}</button>` :
-                            file.isDir ? 
-                                `<button class="btn btn-primary" onclick="fileManager.navigateToFolder('${file.path}')">${translator.get('open')}</button>` : 
-                                `${canPreviewFile ? `<button class="btn btn-secondary" onclick="fileManager.previewFile('${file.name}')">${translator.get('preview')}</button>` : ''}
-                                <button class="btn btn-primary" onclick="fileManager.downloadFile('${file.name}')">${translator.get('download')}</button>`}
-                    </div>
-                </div>
-            `;
-        }
+        // Используем глобальную функцию
+        renderFiles(container, this.filteredFiles, this.searchTerm, this.currentView);
     }
 
     // Скачивание файла
@@ -718,9 +619,6 @@ class FileManager {
         }
     }
 }
-// Вспомогательная функция для экранирования HTML
-function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-}
+
+// Делаем fileManager глобально доступным
+window.fileManager = new FileManager();

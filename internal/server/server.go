@@ -1,7 +1,9 @@
 package server
 
 import (
+	"fmt"
 	"html/template"
+	"io"
 	"net/http"
 
 	"file-server-go/internal/assets"
@@ -79,6 +81,31 @@ func (s *Server) Router() http.Handler {
 	// Embedded static files
 	staticFS := assets.GetStaticFS()
 	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.FS(staticFS))))
+
+	// Favicon handler
+	mux.HandleFunc("/favicon.ico", func(w http.ResponseWriter, r *http.Request) {
+		// Проверяем наличие favicon в web директории
+		webFS := assets.GetWebFS()
+		faviconFile, err := webFS.Open("favicon.ico")
+		if err != nil {
+			// Если favicon не найден, возвращаем 404
+			http.NotFound(w, r)
+			return
+		}
+		defer faviconFile.Close()
+
+		// Читаем содержимое файла
+		content, err := io.ReadAll(faviconFile)
+		if err != nil {
+			http.Error(w, "Error reading file", http.StatusInternalServerError)
+			return
+		}
+
+		// Устанавливаем заголовки и отправляем содержимое
+		w.Header().Set("Content-Type", "image/x-icon")
+		w.Header().Set("Content-Length", fmt.Sprintf("%d", len(content)))
+		w.Write(content)
+	})
 
 	// Main page using embedded template
 	mux.HandleFunc("/", s.handleHome)

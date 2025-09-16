@@ -30,9 +30,10 @@ func CORS(next http.Handler) http.Handler {
 // Auth проверяет JWT токен
 func Auth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Пропускаем авторизацию для логина, корневой страницы и статических файлов
+		// Пропускаем авторизацию для логина, корневой страницы, статических файлов и favicon
 		if r.URL.Path == "/login" || r.URL.Path == "/" ||
-			strings.HasPrefix(r.URL.Path, "/static/") {
+			strings.HasPrefix(r.URL.Path, "/static/") ||
+			r.URL.Path == "/favicon.ico" {
 			next.ServeHTTP(w, r)
 			return
 		}

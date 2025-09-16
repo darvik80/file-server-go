@@ -28,9 +28,9 @@ func GetTemplateFS() fs.FS {
 	return templateFS
 }
 
-// GetStaticFS returns filesystem for static files (CSS, JS)
+// GetStaticFS returns filesystem for static files (CSS, JS, and root files like favicon)
 func GetStaticFS() fs.FS {
-	// Create filesystem that includes css and js folders
+	// Create filesystem that includes css, js folders and root files
 	return &staticFS{webFS: WebFiles}
 }
 
