@@ -126,5 +126,3 @@ class AppManager {
     }
 }
 
-// Делаем appManager глобально доступным
-window.appManager = new AppManager();

@@ -187,5 +187,3 @@ class UserManager {
     }
 }
 
-// Делаем userManager глобально доступным
-window.userManager = new UserManager();

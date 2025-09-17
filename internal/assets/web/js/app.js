@@ -4,8 +4,10 @@
 document.addEventListener('DOMContentLoaded', function() {
     console.log('Файловый сервер запущен');
     
-    // Создаем экземпляр менеджера файлов
+    // Создаем экземпляры менеджеров
     window.fileManager = new FileManager();
+    window.userManager = new UserManager();
+    window.appManager = new AppManager();
     
     // Обработчик закрытия модального окна
     const modal = document.getElementById('previewModal');

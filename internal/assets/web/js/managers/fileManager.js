@@ -23,6 +23,7 @@ class FileManager {
     }
 
     bindEvents() {
+        console.log("fileManager::bindEvents");
         // Авторизация
         const loginForm = document.getElementById('loginForm');
         if (loginForm) {
@@ -58,10 +59,13 @@ class FileManager {
                 this.handleFileUpload(files);
             });
 
+
             // Клик по области загрузки
-            uploadArea.addEventListener('click', () => {
+            let fileInputClick = () => {
                 fileInput.click();
-            });
+            }
+            uploadArea.removeEventListener('click', fileInputClick);
+            uploadArea.addEventListener('click', fileInputClick);
 
             // Выбор файлов через input
             fileInput.addEventListener('change', (e) => {
@@ -632,5 +636,3 @@ class FileManager {
     }
 }
 
-// Делаем fileManager глобально доступным
-window.fileManager = new FileManager();
