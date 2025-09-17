@@ -65,6 +65,7 @@ func (s *Server) Router() http.Handler {
 	mux.HandleFunc("/users", s.userHandler.GetUsers)
 	mux.HandleFunc("/create-user", s.userHandler.CreateUser)
 	mux.HandleFunc("/delete-user", s.userHandler.DeleteUser)
+	mux.HandleFunc("/change-password", s.userHandler.ChangePassword)
 
 	// Application raw file upload route
 	mux.HandleFunc("/upload/raw", s.appHandler.UploadRawFile)

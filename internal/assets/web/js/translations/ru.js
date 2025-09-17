@@ -86,7 +86,13 @@ const ruTranslations = {
     'createDir': 'Создать папку',
     'dirName': 'Имя папки',
     'dirCreated': 'Папка успешно создана',
-    'createDirError': 'Ошибка при создании папки'
+    'createDirError': 'Ошибка при создании папки',
+    // Добавленные переводы для функции изменения пароля
+    'changePassword': 'Изменить пароль',
+    'oldPassword': 'Старый пароль',
+    'newPassword': 'Новый пароль',
+    'passwordChanged': 'Пароль успешно изменен',
+    'changePasswordError': 'Ошибка при изменении пароля'
 };
 
 window.ruTranslations = ruTranslations;

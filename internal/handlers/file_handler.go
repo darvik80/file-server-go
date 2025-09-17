@@ -15,6 +15,7 @@ import (
 	"file-server-go/internal/auth"
 	"file-server-go/internal/database"
 	"file-server-go/internal/models"
+	"file-server-go/internal/utils"
 )
 
 // ErrorResponse represents the structure of an error response
@@ -48,7 +49,7 @@ type FileHandler struct {
 	db        *database.DB
 }
 
-// NewFileHandler creates a new file handler
+// NewFileHandler creates new file handler
 func NewFileHandler(uploadDir string, db *database.DB) *FileHandler {
 	return &FileHandler{
 		uploadDir: uploadDir,
@@ -428,6 +429,7 @@ func (h *FileHandler) ListFiles(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// DownloadFile handles file download with proper content type detection
 func (h *FileHandler) DownloadFile(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		sendError(w, "Method not supported", http.StatusMethodNotAllowed)
@@ -447,7 +449,12 @@ func (h *FileHandler) DownloadFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	filePath := filepath.Join(h.uploadDir, filename)
+	// Validate path using utility function
+	filePath, err := utils.ValidatePath(filename, h.uploadDir)
+	if err != nil {
+		sendError(w, err.Error(), http.StatusForbidden)
+		return
+	}
 
 	// Check file existence
 	if _, err := os.Stat(filePath); os.IsNotExist(err) {
@@ -455,54 +462,12 @@ func (h *FileHandler) DownloadFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Определяем Content-Type на основе расширения файла
-	contentType := "application/octet-stream"
-	ext := strings.ToLower(filepath.Ext(filename))
-
-	switch ext {
-	case ".png":
-		contentType = "image/png"
-	case ".jpg", ".jpeg":
-		contentType = "image/jpeg"
-	case ".gif":
-		contentType = "image/gif"
-	case ".bmp":
-		contentType = "image/bmp"
-	case ".webp":
-		contentType = "image/webp"
-	case ".svg":
-		contentType = "image/svg+xml"
-	case ".ico":
-		contentType = "image/x-icon"
-	case ".txt":
-		contentType = "text/plain"
-	case ".html", ".htm":
-		contentType = "text/html"
-	case ".css":
-		contentType = "text/css"
-	case ".js":
-		contentType = "application/javascript"
-	case ".json":
-		contentType = "application/json"
-	case ".pdf":
-		contentType = "application/pdf"
-	case ".xml":
-		contentType = "application/xml"
-	}
-
-	// Устанавливаем Content-Type
+	// Get content type using utility function
+	contentType := utils.GetContentTypeByExtension(filename)
 	w.Header().Set("Content-Type", contentType)
 
-	// Для изображений и других файлов, которые можно отображать в браузере,
-	// не устанавливаем Content-Disposition, чтобы файл отображался в браузере
-	// Для остальных файлов устанавливаем Content-Disposition: attachment
-	isPreviewable := strings.HasPrefix(contentType, "image/") ||
-		contentType == "text/html" ||
-		contentType == "text/plain" ||
-		contentType == "application/pdf" ||
-		contentType == "application/json"
-
-	if !isPreviewable {
+	// Check if content is previewable using utility function
+	if !utils.IsPreviewableContent(contentType) {
 		w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s", filename))
 	}
 

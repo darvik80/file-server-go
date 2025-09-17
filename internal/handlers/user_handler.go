@@ -5,9 +5,9 @@ import (
 	"net/http"
 	"strconv"
 
-	"file-server-go/internal/auth"
 	"file-server-go/internal/database"
 	"file-server-go/internal/models"
+	"file-server-go/internal/utils"
 )
 
 // UserHandler handles user-related requests
@@ -34,23 +34,10 @@ func (h *UserHandler) GetUsers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get current user from context
-	currentUsername := auth.GetUserFromContext(r.Context())
-	if currentUsername == "" {
-		sendError(w, "User not authenticated", http.StatusUnauthorized)
-		return
-	}
-
-	// Find current user
-	currentUser := &models.User{}
-	if err := currentUser.FindUserByUsername(h.db.DB, currentUsername); err != nil {
-		sendError(w, "User not found", http.StatusNotFound)
-		return
-	}
-
-	// Check if user has admin role
-	if !currentUser.HasAdminRole() {
-		sendError(w, "Access denied. Admin rights required", http.StatusForbidden)
+	// Check admin role using utility function
+	_, err := utils.CheckAdminRole(r, h.db)
+	if err != nil {
+		sendError(w, err.Error(), http.StatusUnauthorized)
 		return
 	}
 
@@ -81,23 +68,10 @@ func (h *UserHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get current user from context
-	currentUsername := auth.GetUserFromContext(r.Context())
-	if currentUsername == "" {
-		sendError(w, "User not authenticated", http.StatusUnauthorized)
-		return
-	}
-
-	// Find current user
-	currentUser := &models.User{}
-	if err := currentUser.FindUserByUsername(h.db.DB, currentUsername); err != nil {
-		sendError(w, "User not found", http.StatusNotFound)
-		return
-	}
-
-	// Check if user has admin role
-	if !currentUser.HasAdminRole() {
-		sendError(w, "Access denied. Admin rights required", http.StatusForbidden)
+	// Check admin role using utility function
+	currentUser, err := utils.CheckAdminRole(r, h.db)
+	if err != nil {
+		sendError(w, err.Error(), http.StatusUnauthorized)
 		return
 	}
 
@@ -122,7 +96,7 @@ func (h *UserHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Check if user tries to delete themselves
-	if userToDelete.Username == currentUsername {
+	if userToDelete.Username == currentUser.Username {
 		sendError(w, "You cannot delete yourself", http.StatusForbidden)
 		return
 	}
@@ -159,23 +133,10 @@ func (h *UserHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get current user from context
-	currentUsername := auth.GetUserFromContext(r.Context())
-	if currentUsername == "" {
-		sendError(w, "User not authenticated", http.StatusUnauthorized)
-		return
-	}
-
-	// Find current user
-	currentUser := &models.User{}
-	if err := currentUser.FindUserByUsername(h.db.DB, currentUsername); err != nil {
-		sendError(w, "User not found", http.StatusNotFound)
-		return
-	}
-
-	// Check if user has admin role
-	if !currentUser.HasAdminRole() {
-		sendError(w, "Access denied. Admin rights required", http.StatusForbidden)
+	// Check admin role using utility function
+	_, err := utils.CheckAdminRole(r, h.db)
+	if err != nil {
+		sendError(w, err.Error(), http.StatusUnauthorized)
 		return
 	}
 
@@ -252,17 +213,10 @@ func (h *UserHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get current user from context
-	currentUsername := auth.GetUserFromContext(r.Context())
-	if currentUsername == "" {
-		sendError(w, "User not authenticated", http.StatusUnauthorized)
-		return
-	}
-
-	// Find current user
-	currentUser := &models.User{}
-	if err := currentUser.FindUserByUsername(h.db.DB, currentUsername); err != nil {
-		sendError(w, "User not found", http.StatusNotFound)
+	// Get current user using utility function
+	currentUser, err := utils.GetCurrentUser(r, h.db)
+	if err != nil {
+		sendError(w, err.Error(), http.StatusUnauthorized)
 		return
 	}
 
@@ -280,7 +234,7 @@ func (h *UserHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 
 	// Find user in database
 	user := &models.User{}
-	err := user.FindUserByUsername(h.db.DB, req.Username)
+	err = user.FindUserByUsername(h.db.DB, req.Username)
 	if err != nil {
 		sendError(w, "User not found", http.StatusNotFound)
 		return

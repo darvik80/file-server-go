@@ -86,7 +86,13 @@ const enTranslations = {
     'createDir': 'Create Directory',
     'dirName': 'Directory Name',
     'dirCreated': 'Directory created successfully',
-    'createDirError': 'Error creating directory'
+    'createDirError': 'Error creating directory',
+    // Added translations for password change function
+    'changePassword': 'Change Password',
+    'oldPassword': 'Old Password',
+    'newPassword': 'New Password',
+    'passwordChanged': 'Password changed successfully',
+    'changePasswordError': 'Error changing password'
 };
 
 window.enTranslations = enTranslations;

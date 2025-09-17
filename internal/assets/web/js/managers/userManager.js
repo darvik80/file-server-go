@@ -48,6 +48,38 @@ class UserManager {
         } else if (oldPasswordGroup) {
             oldPasswordGroup.style.display = 'block';
         }
+
+        // Очищаем поле имени пользователя
+        const usernameField = document.getElementById('changePasswordUsername');
+        if (usernameField) {
+            usernameField.value = '';
+        }
+    }
+
+    // Показать модальное окно изменения пароля для конкретного пользователя
+    showChangePasswordModalForUser(username) {
+        const modal = new bootstrap.Modal(document.getElementById('changePasswordModal'));
+        modal.show();
+
+        // Если пользователь администратор, скрываем поле старого пароля
+        const userRole = fileManager.userRole;
+        const oldPasswordGroup = document.getElementById('oldPasswordGroup');
+
+        if (userRole === 'admin' && oldPasswordGroup) {
+            oldPasswordGroup.style.display = 'none';
+        } else if (oldPasswordGroup) {
+            oldPasswordGroup.style.display = 'block';
+        }
+
+        // Предзаполняем поле имени пользователя
+        const usernameField = document.getElementById('changePasswordUsername');
+        if (usernameField) {
+            usernameField.value = username;
+            // Делаем поле только для чтения, если администратор редактирует пароль другого пользователя
+            if (userRole === 'admin') {
+                usernameField.readOnly = true;
+            }
+        }
     }
 
     // Обновление списка пользователей
@@ -158,8 +190,12 @@ class UserManager {
                 modal.hide();
             }
 
-            // Очищаем форму
+            // Очищаем форму и сбрасываем состояние поля имени пользователя
             document.getElementById('changePasswordForm').reset();
+            const usernameField = document.getElementById('changePasswordUsername');
+            if (usernameField) {
+                usernameField.readOnly = false; // Сбрасываем readonly состояние
+            }
         } catch (error) {
             if (error.message === 'unauthorized') {
                 fileManager.logout();
@@ -186,4 +222,3 @@ class UserManager {
         }
     }
 }
-

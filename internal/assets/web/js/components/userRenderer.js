@@ -23,6 +23,7 @@ function createUserHTML(user) {
             <td>${roleDisplay}</td>
             <td>${user.created_at ? new Date(user.created_at).toLocaleDateString() : ''}</td>
             <td>
+                <button class="btn btn-warning btn-sm me-2" onclick="userManager.showChangePasswordModalForUser('${user.username}')" data-i18n="changePassword">Изменить пароль</button>
                 <button class="btn btn-danger btn-sm" onclick="userManager.deleteUser(${user.id})" data-i18n="delete">Удалить</button>
             </td>
         </tr>
