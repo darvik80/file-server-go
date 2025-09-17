@@ -2,7 +2,7 @@
 const CONSTANTS = {
     API_BASE: '',
     MAX_FILE_SIZE: 10 * 1024 * 1024, // 10MB
-    SUPPORTED_PREVIEW_TYPES: ['image/jpeg', 'image/png', 'image/gif', 'text/plain', 'application/json']
+    SUPPORTED_PREVIEW_TYPES: ['image/jpg', 'image/jpeg', 'image/png', 'image/gif', 'text/plain', 'application/json']
 };
 
 // Утилиты для работы с путями

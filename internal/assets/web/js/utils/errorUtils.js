@@ -31,13 +31,6 @@ function debounce(func, wait) {
     };
 }
 
-// Проверка типа файла для предварительного просмотра
-function canPreview(filename) {
-    const ext = PathUtils.getFileExtension(filename);
-    const previewableTypes = ['jpg', 'jpeg', 'png', 'gif', 'txt', 'md', 'json', 'html', 'css', 'js'];
-    return previewableTypes.includes(ext);
-}
-
 // Вспомогательная функция для экранирования HTML
 function escapeHtml(text) {
     const div = document.createElement('div');
@@ -47,5 +40,4 @@ function escapeHtml(text) {
 
 window.handleError = handleError;
 window.debounce = debounce;
-window.canPreview = canPreview;
 window.escapeHtml = escapeHtml;

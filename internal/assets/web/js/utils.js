@@ -90,10 +90,10 @@ function debounce(func, wait) {
 }
 
 // Проверка типа файла для предварительного просмотра
+// Теперь сервер правильно устанавливает Content-Type, поэтому разрешаем предварительный просмотр для всех файлов
 function canPreview(filename) {
-    const ext = PathUtils.getFileExtension(filename);
-    const previewableTypes = ['jpg', 'jpeg', 'png', 'gif', 'txt', 'md', 'json', 'html', 'css', 'js'];
-    return previewableTypes.includes(ext);
+    // Всегда разрешаем предварительный просмотр, так как сервер теперь правильно устанавливает Content-Type
+    return true;
 }
 
 // Экспорт функций в глобальную область

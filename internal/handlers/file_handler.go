@@ -455,9 +455,56 @@ func (h *FileHandler) DownloadFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Set headers for download
-	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s", filename))
-	w.Header().Set("Content-Type", "application/octet-stream")
+	// Определяем Content-Type на основе расширения файла
+	contentType := "application/octet-stream"
+	ext := strings.ToLower(filepath.Ext(filename))
+
+	switch ext {
+	case ".png":
+		contentType = "image/png"
+	case ".jpg", ".jpeg":
+		contentType = "image/jpeg"
+	case ".gif":
+		contentType = "image/gif"
+	case ".bmp":
+		contentType = "image/bmp"
+	case ".webp":
+		contentType = "image/webp"
+	case ".svg":
+		contentType = "image/svg+xml"
+	case ".ico":
+		contentType = "image/x-icon"
+	case ".txt":
+		contentType = "text/plain"
+	case ".html", ".htm":
+		contentType = "text/html"
+	case ".css":
+		contentType = "text/css"
+	case ".js":
+		contentType = "application/javascript"
+	case ".json":
+		contentType = "application/json"
+	case ".pdf":
+		contentType = "application/pdf"
+	case ".xml":
+		contentType = "application/xml"
+	}
+
+	// Устанавливаем Content-Type
+	w.Header().Set("Content-Type", contentType)
+
+	// Для изображений и других файлов, которые можно отображать в браузере,
+	// не устанавливаем Content-Disposition, чтобы файл отображался в браузере
+	// Для остальных файлов устанавливаем Content-Disposition: attachment
+	isPreviewable := strings.HasPrefix(contentType, "image/") ||
+		contentType == "text/html" ||
+		contentType == "text/plain" ||
+		contentType == "application/pdf" ||
+		contentType == "application/json"
+
+	if !isPreviewable {
+		w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s", filename))
+	}
 
 	// Serve file
 	http.ServeFile(w, r, filePath)
