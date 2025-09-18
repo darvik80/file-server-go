@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"file-server-go/internal/config"
+	"file-server-go/internal/database"
 )
 
 func TestAuthHandler(t *testing.T) {
@@ -23,7 +24,14 @@ func TestAuthHandler(t *testing.T) {
 		MaxFileSize: 10 << 20, // 10MB
 	}
 
-	handler := NewAuthHandler(cfg)
+	// Создаем тестовую базу данных в памяти
+	db, err := database.New()
+	if err != nil {
+		t.Fatalf("Failed to create test database: %v", err)
+	}
+	defer db.Close()
+
+	handler := NewAuthHandler(cfg, db)
 
 	t.Run("ValidLogin", func(t *testing.T) {
 		testValidLogin(t, handler)

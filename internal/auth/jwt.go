@@ -59,7 +59,12 @@ func ValidateToken(tokenStr string) (*Claims, error) {
 		return nil, ErrKeyNotSet
 	}
 
-	log.Printf("Validating token: %s", tokenStr[:10]) // Log only beginning of token
+	// Log only beginning of token (safe substring)
+	logToken := tokenStr
+	if len(tokenStr) > 10 {
+		logToken = tokenStr[:10]
+	}
+	log.Printf("Validating token: %s", logToken)
 
 	claims := &Claims{}
 	token, err := jwt.ParseWithClaims(tokenStr, claims, func(token *jwt.Token) (interface{}, error) {

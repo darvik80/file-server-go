@@ -13,52 +13,92 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
+
+	"file-server-go/internal/auth"
+	"file-server-go/internal/database"
+	"file-server-go/internal/models"
 )
 
-func TestFileHandler(t *testing.T) {
+// setupTestEnvironment создает тестовое окружение с аутентификацией
+func setupTestEnvironment(t *testing.T) (*FileHandler, *database.DB, string, string) {
 	// Создаем временную директорию для тестов
 	tempDir, err := os.MkdirTemp("", "file_handler_test")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
+
+	// Создаем тестовую базу данных
+	db, err := database.New()
+	if err != nil {
+		t.Fatalf("Failed to create test database: %v", err)
+	}
+
+	// Создаем тестового пользователя с уникальным именем
+	uniqueUsername := fmt.Sprintf("testwriter_%d", time.Now().UnixNano())
+	testUser := &models.User{
+		Username: uniqueUsername,
+		Password: "testpass",
+		Role:     models.WriterRole,
+	}
+	if err := testUser.CreateUser(db.DB); err != nil {
+		t.Fatalf("Failed to create test user: %v", err)
+	}
+
+	// Настраиваем JWT ключ для тестов
+	auth.SetJWTKey("test-jwt-key")
+
+	handler := NewFileHandler(tempDir, db)
+
+	return handler, db, tempDir, uniqueUsername
+}
+
+// addAuthToRequest добавляет аутентификацию к запросу
+func addAuthToRequest(req *http.Request, username string) {
+	// Добавляем пользователя в контекст запроса (имитируем middleware)
+	ctx := auth.SetUserContext(req.Context(), username)
+	*req = *req.WithContext(ctx)
+}
+
+func TestFileHandler(t *testing.T) {
+	handler, db, tempDir, username := setupTestEnvironment(t)
+	defer db.Close()
 	defer os.RemoveAll(tempDir)
 
-	handler := NewFileHandler(tempDir)
-
 	t.Run("UploadFile", func(t *testing.T) {
-		testUploadFile(t, handler, tempDir)
+		testUploadFile(t, handler, tempDir, username)
 	})
 
 	t.Run("ListFiles", func(t *testing.T) {
-		testListFiles(t, handler, tempDir)
+		testListFiles(t, handler, tempDir, username)
 	})
 
 	t.Run("DownloadFile", func(t *testing.T) {
-		testDownloadFile(t, handler, tempDir)
+		testDownloadFile(t, handler, tempDir, username)
 	})
 
 	t.Run("CreateDirectory", func(t *testing.T) {
-		testCreateDirectory(t, handler, tempDir)
+		testCreateDirectory(t, handler, tempDir, username)
 	})
 
 	t.Run("DeleteDirectory", func(t *testing.T) {
-		testDeleteDirectory(t, handler, tempDir)
+		testDeleteDirectory(t, handler, tempDir, username)
 	})
 
 	t.Run("DeleteFile", func(t *testing.T) {
-		testDeleteFile(t, handler, tempDir)
+		testDeleteFile(t, handler, tempDir, username)
 	})
 
 	t.Run("PreviewHTMLFile", func(t *testing.T) {
-		testPreviewHTMLFile(t, handler, tempDir)
+		testPreviewHTMLFile(t, handler, tempDir, username)
 	})
 
 	t.Run("ErrorCases", func(t *testing.T) {
-		testErrorCases(t, handler, tempDir)
+		testErrorCases(t, handler, tempDir, username)
 	})
 }
 
-func testUploadFile(t *testing.T, handler *FileHandler, tempDir string) {
+func testUploadFile(t *testing.T, handler *FileHandler, tempDir, username string) {
 	tests := []struct {
 		name          string
 		filename      string
@@ -114,6 +154,10 @@ func testUploadFile(t *testing.T, handler *FileHandler, tempDir string) {
 
 			req := httptest.NewRequest("POST", "/upload", body)
 			req.Header.Set("Content-Type", writer.FormDataContentType())
+
+			// Добавляем аутентификацию
+			addAuthToRequest(req, username)
+
 			w := httptest.NewRecorder()
 
 			handler.UploadFile(w, req)
@@ -139,7 +183,7 @@ func testUploadFile(t *testing.T, handler *FileHandler, tempDir string) {
 	}
 }
 
-func testListFiles(t *testing.T, handler *FileHandler, tempDir string) {
+func testListFiles(t *testing.T, handler *FileHandler, tempDir, username string) {
 	// Создаем тестовые файлы и директории
 	testFiles := []struct {
 		path    string
@@ -183,6 +227,9 @@ func testListFiles(t *testing.T, handler *FileHandler, tempDir string) {
 				req = httptest.NewRequest("GET", fmt.Sprintf("/files?path=%s", url.QueryEscape(tt.path)), nil)
 			}
 
+			// Добавляем аутентификацию
+			addAuthToRequest(req, username)
+
 			w := httptest.NewRecorder()
 			handler.ListFiles(w, req)
 
@@ -203,7 +250,7 @@ func testListFiles(t *testing.T, handler *FileHandler, tempDir string) {
 	}
 }
 
-func testDownloadFile(t *testing.T, handler *FileHandler, tempDir string) {
+func testDownloadFile(t *testing.T, handler *FileHandler, tempDir, username string) {
 	// Создаем тестовый файл
 	testContent := "Hello, this is test content for download"
 	testFile := "download_test.txt"
@@ -212,6 +259,10 @@ func testDownloadFile(t *testing.T, handler *FileHandler, tempDir string) {
 
 	t.Run("valid download", func(t *testing.T) {
 		req := httptest.NewRequest("GET", "/download/"+testFile, nil)
+
+		// Добавляем аутентификацию
+		addAuthToRequest(req, username)
+
 		w := httptest.NewRecorder()
 
 		handler.DownloadFile(w, req)
@@ -229,6 +280,10 @@ func testDownloadFile(t *testing.T, handler *FileHandler, tempDir string) {
 
 	t.Run("non-existent file", func(t *testing.T) {
 		req := httptest.NewRequest("GET", "/download/nonexistent.txt", nil)
+
+		// Добавляем аутентификацию
+		addAuthToRequest(req, username)
+
 		w := httptest.NewRecorder()
 
 		handler.DownloadFile(w, req)
@@ -240,7 +295,7 @@ func testDownloadFile(t *testing.T, handler *FileHandler, tempDir string) {
 	})
 }
 
-func testCreateDirectory(t *testing.T, handler *FileHandler, tempDir string) {
+func testCreateDirectory(t *testing.T, handler *FileHandler, tempDir, username string) {
 	tests := []struct {
 		name          string
 		dirname       string
@@ -261,6 +316,10 @@ func testCreateDirectory(t *testing.T, handler *FileHandler, tempDir string) {
 			})
 
 			req := httptest.NewRequest("POST", "/create-dir", bytes.NewReader(body))
+
+			// Добавляем аутентификацию
+			addAuthToRequest(req, username)
+
 			w := httptest.NewRecorder()
 
 			handler.CreateDirectory(w, req)
@@ -287,7 +346,7 @@ func testCreateDirectory(t *testing.T, handler *FileHandler, tempDir string) {
 	}
 }
 
-func testDeleteDirectory(t *testing.T, handler *FileHandler, tempDir string) {
+func testDeleteDirectory(t *testing.T, handler *FileHandler, tempDir, username string) {
 	// Создаем тестовую директорию
 	testDir := "dir_to_delete"
 	fullPath := filepath.Join(tempDir, testDir)
@@ -296,6 +355,10 @@ func testDeleteDirectory(t *testing.T, handler *FileHandler, tempDir string) {
 
 	t.Run("valid delete", func(t *testing.T) {
 		req := httptest.NewRequest("DELETE", "/delete-dir?path="+testDir, nil)
+
+		// Добавляем аутентификацию
+		addAuthToRequest(req, username)
+
 		w := httptest.NewRecorder()
 
 		handler.DeleteDirectory(w, req)
@@ -313,6 +376,10 @@ func testDeleteDirectory(t *testing.T, handler *FileHandler, tempDir string) {
 
 	t.Run("non-existent directory", func(t *testing.T) {
 		req := httptest.NewRequest("DELETE", "/delete-dir?path=nonexistent", nil)
+
+		// Добавляем аутентификацию
+		addAuthToRequest(req, username)
+
 		w := httptest.NewRecorder()
 
 		handler.DeleteDirectory(w, req)
@@ -325,6 +392,10 @@ func testDeleteDirectory(t *testing.T, handler *FileHandler, tempDir string) {
 
 	t.Run("delete root directory", func(t *testing.T) {
 		req := httptest.NewRequest("DELETE", "/delete-dir?path=.", nil)
+
+		// Добавляем аутентификацию
+		addAuthToRequest(req, username)
+
 		w := httptest.NewRecorder()
 
 		handler.DeleteDirectory(w, req)
@@ -336,7 +407,7 @@ func testDeleteDirectory(t *testing.T, handler *FileHandler, tempDir string) {
 	})
 }
 
-func testDeleteFile(t *testing.T, handler *FileHandler, tempDir string) {
+func testDeleteFile(t *testing.T, handler *FileHandler, tempDir, username string) {
 	// Создаем тестовый файл
 	testFile := "file_to_delete.txt"
 	fullPath := filepath.Join(tempDir, testFile)
@@ -344,6 +415,10 @@ func testDeleteFile(t *testing.T, handler *FileHandler, tempDir string) {
 
 	t.Run("valid delete", func(t *testing.T) {
 		req := httptest.NewRequest("DELETE", "/delete-file?path="+testFile, nil)
+
+		// Добавляем аутентификацию
+		addAuthToRequest(req, username)
+
 		w := httptest.NewRecorder()
 
 		handler.DeleteFile(w, req)
@@ -361,6 +436,10 @@ func testDeleteFile(t *testing.T, handler *FileHandler, tempDir string) {
 
 	t.Run("non-existent file", func(t *testing.T) {
 		req := httptest.NewRequest("DELETE", "/delete-file?path=nonexistent.txt", nil)
+
+		// Добавляем аутентификацию
+		addAuthToRequest(req, username)
+
 		w := httptest.NewRecorder()
 
 		handler.DeleteFile(w, req)
@@ -378,6 +457,10 @@ func testDeleteFile(t *testing.T, handler *FileHandler, tempDir string) {
 		os.MkdirAll(fullPath, 0755)
 
 		req := httptest.NewRequest("DELETE", "/delete-file?path="+testDir, nil)
+
+		// Добавляем аутентификацию
+		addAuthToRequest(req, username)
+
 		w := httptest.NewRecorder()
 
 		handler.DeleteFile(w, req)
@@ -389,7 +472,7 @@ func testDeleteFile(t *testing.T, handler *FileHandler, tempDir string) {
 	})
 }
 
-func testPreviewHTMLFile(t *testing.T, handler *FileHandler, tempDir string) {
+func testPreviewHTMLFile(t *testing.T, handler *FileHandler, tempDir, username string) {
 	// Создаем тестовый HTML файл
 	htmlContent := "<html><body><h1>Test HTML Preview</h1></body></html>"
 	htmlFile := "test.html"
@@ -398,6 +481,10 @@ func testPreviewHTMLFile(t *testing.T, handler *FileHandler, tempDir string) {
 
 	t.Run("valid html preview", func(t *testing.T) {
 		req := httptest.NewRequest("GET", "/download/"+htmlFile, nil)
+
+		// Добавляем аутентификацию
+		addAuthToRequest(req, username)
+
 		w := httptest.NewRecorder()
 
 		handler.DownloadFile(w, req)
@@ -412,20 +499,25 @@ func testPreviewHTMLFile(t *testing.T, handler *FileHandler, tempDir string) {
 			t.Errorf("HTML content doesn't match expected")
 		}
 
-		// Проверяем заголовки
+		// Проверяем заголовки - теперь используем утилитные функции
 		contentType := resp.Header.Get("Content-Type")
-		if contentType != "application/octet-stream" {
-			t.Errorf("Expected Content-Type application/octet-stream, got %s", contentType)
+		if contentType != "text/html" {
+			t.Errorf("Expected Content-Type text/html, got %s", contentType)
 		}
 
+		// HTML файлы должны отображаться в браузере, поэтому Content-Disposition не должен быть attachment
 		contentDisposition := resp.Header.Get("Content-Disposition")
-		if !strings.Contains(contentDisposition, "attachment; filename=") {
-			t.Errorf("Expected Content-Disposition with attachment, got %s", contentDisposition)
+		if strings.Contains(contentDisposition, "attachment") {
+			t.Errorf("HTML files should not have attachment disposition, got %s", contentDisposition)
 		}
 	})
 
 	t.Run("non-existent html file", func(t *testing.T) {
 		req := httptest.NewRequest("GET", "/download/nonexistent.html", nil)
+
+		// Добавляем аутентификацию
+		addAuthToRequest(req, username)
+
 		w := httptest.NewRecorder()
 
 		handler.DownloadFile(w, req)
@@ -437,7 +529,7 @@ func testPreviewHTMLFile(t *testing.T, handler *FileHandler, tempDir string) {
 	})
 }
 
-func testErrorCases(t *testing.T, handler *FileHandler, tempDir string) {
+func testErrorCases(t *testing.T, handler *FileHandler, tempDir, username string) {
 	tests := []struct {
 		name     string
 		method   string
@@ -460,6 +552,11 @@ func testErrorCases(t *testing.T, handler *FileHandler, tempDir string) {
 			req := httptest.NewRequest(tt.method, tt.endpoint, tt.body)
 			if tt.body != nil && tt.method == "POST" {
 				req.Header.Set("Content-Type", "application/json")
+			}
+
+			// Добавляем аутентификацию для POST запросов
+			if tt.method == "POST" {
+				addAuthToRequest(req, username)
 			}
 
 			w := httptest.NewRecorder()
@@ -488,13 +585,9 @@ func testErrorCases(t *testing.T, handler *FileHandler, tempDir string) {
 }
 
 func TestPathSecurity(t *testing.T) {
-	tempDir, err := os.MkdirTemp("", "security_test")
-	if err != nil {
-		t.Fatalf("Failed to create temp dir: %v", err)
-	}
+	handler, db, tempDir, username := setupTestEnvironment(t)
+	defer db.Close()
 	defer os.RemoveAll(tempDir)
-
-	handler := NewFileHandler(tempDir)
 
 	// Тестируем различные попытки обхода безопасности
 	maliciousPaths := []string{
@@ -510,9 +603,10 @@ func TestPathSecurity(t *testing.T) {
 
 	for _, path := range maliciousPaths {
 		t.Run("path_traversal_"+path, func(t *testing.T) {
-			// Тестируем ListFiles (разрешаем "." как валидный путь для корневой директории)
-			if path != "." {
+			// Тестируем ListFiles (разрешаем "." и "" как валидные пути для корневой директории)
+			if path != "." && path != "" {
 				req := httptest.NewRequest("GET", "/files?path="+url.QueryEscape(path), nil)
+				addAuthToRequest(req, username)
 				w := httptest.NewRecorder()
 				handler.ListFiles(w, req)
 
@@ -525,6 +619,7 @@ func TestPathSecurity(t *testing.T) {
 			// Тестируем CreateDirectory
 			body, _ := json.Marshal(CreateDirRequest{Dirname: "test", Path: path})
 			req := httptest.NewRequest("POST", "/create-dir", bytes.NewReader(body))
+			addAuthToRequest(req, username)
 			w := httptest.NewRecorder()
 			handler.CreateDirectory(w, req)
 
@@ -535,6 +630,7 @@ func TestPathSecurity(t *testing.T) {
 
 			// Тестируем DeleteDirectory
 			req = httptest.NewRequest("DELETE", "/delete-dir?path="+path, nil)
+			addAuthToRequest(req, username)
 			w = httptest.NewRecorder()
 			handler.DeleteDirectory(w, req)
 
@@ -545,6 +641,7 @@ func TestPathSecurity(t *testing.T) {
 
 			// Тестируем DeleteFile
 			req = httptest.NewRequest("DELETE", "/delete-file?path="+path, nil)
+			addAuthToRequest(req, username)
 			w = httptest.NewRecorder()
 			handler.DeleteFile(w, req)
 
@@ -583,7 +680,28 @@ func BenchmarkUploadFile(b *testing.B) {
 	}
 	defer os.RemoveAll(tempDir)
 
-	handler := NewFileHandler(tempDir)
+	// Создаем тестовую базу данных
+	db, err := database.New()
+	if err != nil {
+		b.Fatalf("Failed to create test database: %v", err)
+	}
+	defer db.Close()
+
+	// Создаем тестового пользователя
+	uniqueUsername := fmt.Sprintf("benchuser_%d", time.Now().UnixNano())
+	testUser := &models.User{
+		Username: uniqueUsername,
+		Password: "testpass",
+		Role:     models.WriterRole,
+	}
+	if err := testUser.CreateUser(db.DB); err != nil {
+		b.Fatalf("Failed to create test user: %v", err)
+	}
+
+	// Настраиваем JWT ключ для тестов
+	auth.SetJWTKey("bench-jwt-key")
+
+	handler := NewFileHandler(tempDir, db)
 
 	for i := 0; i < b.N; i++ {
 		body := &bytes.Buffer{}
@@ -596,6 +714,10 @@ func BenchmarkUploadFile(b *testing.B) {
 
 		req := httptest.NewRequest("POST", "/upload", body)
 		req.Header.Set("Content-Type", writer.FormDataContentType())
+
+		// Добавляем аутентификацию
+		addAuthToRequest(req, uniqueUsername)
+
 		w := httptest.NewRecorder()
 
 		handler.UploadFile(w, req)
