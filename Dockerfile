@@ -1,6 +1,8 @@
 # Этап сборки
 FROM golang:1.25-alpine AS builder
 
+RUN apk add sqlite-dev gcc musl-dev build-base
+
 WORKDIR /app
 
 # Копируем файлы проекта
@@ -10,7 +12,8 @@ RUN go mod download
 COPY . .
 
 # Собираем приложение
-RUN CGO_ENABLED=0 GOOS=linux go build -o /app/server ./cmd/server
+ENV CGO_ENABLED=1
+RUN go build -o /app/server ./cmd/server
 
 # Финальный этап
 FROM alpine:latest AS file-server
